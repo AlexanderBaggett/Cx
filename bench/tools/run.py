@@ -10,7 +10,7 @@ Output: results/<timestamp>.jsonl. The first line is metadata; each further
 line is one process run:
   {"round": r, "bench": name, "tc": "c"|"cx"|"ctrl", "ns": [...], "checksum": "0x..", "stable": true}
 """
-import argparse, datetime, json, os, platform, random, subprocess, sys
+import argparse, datetime, json, os, platform, random, shutil, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -35,10 +35,22 @@ def main():
     a = ap.parse_args()
 
     tcs = a.toolchains.split(",")
-    bins = {tc: os.path.join(a.build, tc, "bench") for tc in tcs}
-    for tc, b in bins.items():
+    src = {tc: os.path.join(a.build, tc, "bench") for tc in tcs}
+    for tc, b in src.items():
         if not os.access(b, os.X_OK):
             sys.exit(f"run.py: missing {b} (run `make` first)")
+    # Run every toolchain's binary from a path of the same length (build/run/t0,
+    # t1, ...). The program path is copied onto the initial stack, so paths of
+    # different lengths shift stack alignment and can bias timings by a few
+    # percent even for byte-identical binaries.
+    rundir = os.path.join(a.build, "run")
+    os.makedirs(rundir, exist_ok=True)
+    bins = {}
+    for i, tc in enumerate(tcs):
+        dst = os.path.join(rundir, f"t{i}")
+        shutil.copyfile(src[tc], dst)
+        os.chmod(dst, 0o755)
+        bins[tc] = dst
 
     lists = {tc: sh([b, "--list"]) for tc, b in bins.items()}
     if len(set(lists.values())) != 1:
@@ -69,6 +81,7 @@ def main():
         "meta": {
             "time": stamp, "rounds": a.rounds, "iters": a.iters, "cpu": a.cpu,
             "toolchains": tcs, "benchmarks": names, "categories": cats,
+            "run_paths": {tc: os.path.relpath(bins[tc], ROOT) for tc in tcs},
             "machine": {"platform": platform.platform(), "processor": sh(["sh", "-c", "grep -m1 'model name' /proc/cpuinfo"]),
                         "nproc": os.cpu_count()},
             "buildinfo": buildinfo,
