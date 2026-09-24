@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Design draft. Normative in intent, not yet implemented. |
 | **Base language** | ISO C23 (ISO/IEC 9899:2024). Anything this document does not change is exactly C23. |
-| **Reference compiler** | The Clang/LLVM 23.1.2 tree vendored in this repository |
+| **Reference compiler** | The Clang/LLVM 23.1.2 tree vendored in this repository: `upstream/` is the unmodified reference, and `cx/` is the copy that becomes the Cx compiler. Source citations such as `clang/lib/CodeGen/CGCall.cpp:3602` are relative to `upstream/`; the same lines exist in `cx/` until Cx changes them. |
 | **Evidence** | [`docs/analysis/c-optimization-barriers.md`](../analysis/c-optimization-barriers.md), cited as **[A§n]**. Micro-kernels are cited as **[E01]**…**[E13]** from [`docs/analysis/c-optimization-barriers/kernels/`](../analysis/c-optimization-barriers/kernels/). |
 
 ---
@@ -1179,7 +1179,7 @@ static int op_add(struct vm *vm, const struct insn *ip) {
 
 ## 20. Implementation and measurement plan
 
-Design first, measure before freezing syntax. Each phase ends with the census [A§4] and the ablation benchmarks [A§5] rerun on SQLite, Lua and zstd, ported as needed. Each phase must also pass those projects' own test suites, because many contracts are unchecked.
+All implementation work happens in the `cx/` tree, and paths in this section are relative to `cx/`. `upstream/` stays unmodified as the benchmark reference. Design first, measure before freezing syntax. Each phase ends with the census [A§4] and the ablation benchmarks [A§5] rerun on SQLite, Lua and zstd, ported as needed. Each phase must also pass those projects' own test suites, because many contracts are unchecked.
 
 | Phase | Deliverable in the vendored Clang | Where |
 |---|---|---|

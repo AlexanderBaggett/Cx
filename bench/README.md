@@ -4,8 +4,8 @@ This suite compares two toolchains on the same algorithms:
 
 | Toolchain | Compiler | Sources |
 |---|---|---|
-| **C** (reference) | The unchanged official LLVM/Clang **23.1.2** release | `src/*.c` |
-| **Cx** | Clang built **from this repository** (the Cx compiler), plus `CX_FLAGS` | `src/*.c`, or a `cx/NAME.cx` override where one exists |
+| **C** (reference) | Clang built from the repository's **`upstream/`** tree (unmodified LLVM/Clang 23.1.2) | `src/*.c` |
+| **Cx** | Clang built from the repository's **`cx/`** tree (the Cx compiler), plus `CX_FLAGS` | `src/*.c`, or a `bench/cx/NAME.cx` override where one exists |
 
 Until the repository's compiler diverges from upstream, both toolchains compile identical source with identical compiler code. Results should then match within run-to-run noise, and the suite starts out as an **A/A test**. As Cx features land in the compiler (see `docs/design/cx-language-spec.md` §20), and as Cx-specific versions are added under `cx/`, the differences show up here.
 
@@ -31,20 +31,16 @@ Until the repository's compiler diverges from upstream, both toolchains compile 
 
 ## The two compilers
 
-```sh
-# Reference: the official release (or set CC_C to any clang 23.1.2 release binary)
-curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.2/LLVM-23.1.2-Linux-X64.tar.xz
-tar xf LLVM-23.1.2-Linux-X64.tar.xz && ln -s "$PWD/LLVM-23.1.2-Linux-X64" ~/llvm-23.1.2-release
+Both compilers are built from this repository with identical CMake settings (Release, X86 target, project `clang`):
 
-# Cx: build this repository's clang (Release, X86 only), next to the checkout in ../cx-build
-cmake -G Ninja -S llvm -B ../cx-build -DCMAKE_BUILD_TYPE=Release \
-  -DLLVM_ENABLE_PROJECTS=clang -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_ASSERTIONS=OFF \
-  -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DCLANG_INCLUDE_TESTS=OFF \
-  -DLLVM_ENABLE_ZSTD=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_LIBXML2=OFF
-ninja -C ../cx-build clang
+```sh
+tools/build-compilers.sh both      # upstream/ -> ../ref-build (C), cx/ -> ../cx-build (Cx)
+ninja -C ../cx-build clang         # after changing cx/
 ```
 
-Override the paths with `make CC_C=… CC_CX=…`. The ISA can be changed for both toolchains with `make MARCH=x86-64-v3`. Each build writes `build/<toolchain>/buildinfo.json`: compiler, version, flags and Cx overrides. Objects depend on it, so changing any of these rebuilds, and `run.py` copies it into the results. Both compilers get the same flags: `-std=c23 -O2 -march=x86-64 -ffp-contract=off` (baseline ISA). With `-ffp-contract=off`, floating-point checksums cannot depend on whether an expression was constant-folded with fused rounding.
+`tools/check-upstream.sh` confirms that `upstream/` is still the unmodified 23.1.2 import. For an independent third reference you can also point `CC_C` at the official LLVM 23.1.2 release binary. It produced identical code to the repository-built compiler in the baseline check (`results/README.md`).
+
+Override the compilers with `make CC_C=… CC_CX=…` (defaults: `../../ref-build/bin/clang` and `../../cx-build/bin/clang` relative to `bench/`). The ISA can be changed for both toolchains with `make MARCH=x86-64-v3`. Each build writes `build/<toolchain>/buildinfo.json`: compiler, version, flags and Cx overrides. Objects depend on it, so changing any of these rebuilds, and `run.py` copies it into the results. Both compilers get the same flags: `-std=c23 -O2 -march=x86-64 -ffp-contract=off` (baseline ISA). With `-ffp-contract=off`, floating-point checksums cannot depend on whether an expression was constant-folded with fused rounding.
 
 ## Running
 

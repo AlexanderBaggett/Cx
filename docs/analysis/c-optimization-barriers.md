@@ -7,7 +7,7 @@ This is a fact-first analysis of the C compiler we vendored (`llvm-project` `llv
 
 Every claim rests on at least one of these kinds of evidence:
 
-- **Code paths.** `path:line` references into this repository. Each was opened and checked; 17 were re-checked by hand for this document.
+- **Code paths.** `path:line` references into this repository's `upstream/` tree, the unmodified import. `cx/` is an identical copy until Cx changes it. Each was opened and checked; 17 were re-checked by hand for this document.
 - **Micro-kernels.** Small C functions that each isolate one language rule. We compiled them with the official LLVM 23.1.2 release binary, which was built from the same commit as our vendored source. We then looked at the IR, the assembly, the optimizer's own remarks, and timings.
 - **A census of real code.** We compiled SQLite, Lua and zstd with optimization records turned on. We counted every place the optimizer reported that it gave up, and why.
 - **Ablation benchmarks.** We rebuilt the same three projects with compiler flags that switch off one C rule at a time, then benchmarked each build.

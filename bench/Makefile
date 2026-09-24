@@ -6,16 +6,16 @@
 #   make run ROUNDS=5     run everything (tools/run.py); results in results/
 #   make report           summarize the newest results file
 #
-# Toolchains
-#   CC_C      the unchanged reference compiler: the official LLVM 23.1.2 release clang
-#   CC_CX     the Cx compiler: clang built from this repository (see README.md)
+# Toolchains (both built from this repository by tools/build-compilers.sh)
+#   CC_C      the reference compiler: clang built from upstream/ (unmodified LLVM 23.1.2)
+#   CC_CX     the Cx compiler: clang built from cx/
 #   CX_FLAGS  Cx language-mode flags for the Cx toolchain (empty until a Cx mode exists)
 #   MARCH     target ISA for both toolchains (default x86-64; e.g. x86-64-v3)
 
-LLVM_REF ?= $(HOME)/llvm-23.1.2-release
-CX_BUILD ?= $(abspath ../../cx-build)
-CC_C     ?= $(LLVM_REF)/bin/clang
-CC_CX    ?= $(CX_BUILD)/bin/clang
+REF_BUILD ?= $(abspath ../../ref-build)
+CX_BUILD  ?= $(abspath ../../cx-build)
+CC_C      ?= $(REF_BUILD)/bin/clang
+CC_CX     ?= $(CX_BUILD)/bin/clang
 CX_FLAGS ?=
 MARCH    ?= x86-64
 OPT      ?= -O2
