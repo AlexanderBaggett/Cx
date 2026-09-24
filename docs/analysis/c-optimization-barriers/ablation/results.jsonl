@@ -1,0 +1,222 @@
+{"round": 0, "bin": "sqlite-native", "sqlite_speedtest1_s": 2.3845800499998404}
+{"round": 0, "bin": "lua-base", "lua_closures_s": 0.6973685560001286, "lua_fib_s": 0.7313231459997951, "lua_nbody_s": 1.5246921299999485, "lua_spectral_s": 0.6094467909997547, "lua_strings_s": 0.6408951019998312, "lua_tables_s": 1.7745405099999516}
+{"round": 0, "bin": "zstd-nobuiltin", "zstd_L1_comp_MBs": 304.2, "zstd_L1_decomp_MBs": 847.7, "zstd_L3_comp_MBs": 173.9, "zstd_L3_decomp_MBs": 645.0}
+{"round": 0, "bin": "zstd-base", "zstd_L1_comp_MBs": 326.4, "zstd_L1_decomp_MBs": 802.1, "zstd_L3_comp_MBs": 177.8, "zstd_L3_decomp_MBs": 638.1}
+{"round": 0, "bin": "sqlite-ctrl", "sqlite_speedtest1_s": 2.586935626000013}
+{"round": 0, "bin": "zstd-nonull", "zstd_L1_comp_MBs": 296.8, "zstd_L1_decomp_MBs": 807.0, "zstd_L3_comp_MBs": 178.0, "zstd_L3_decomp_MBs": 630.0}
+{"round": 0, "bin": "sqlite-nosa", "sqlite_speedtest1_s": 2.428109497999685}
+{"round": 0, "bin": "sqlite-fastmath", "sqlite_speedtest1_s": 2.5114014710002266}
+{"round": 0, "bin": "lua_one-base", "lua_closures_s": 0.6325018389998149, "lua_fib_s": 0.6876675000003161, "lua_nbody_s": 1.4478001600000425, "lua_spectral_s": 0.5606028239999432, "lua_strings_s": 0.5946492539997053, "lua_tables_s": 1.6541469079998024}
+{"round": 0, "bin": "sqlite-nofinite", "sqlite_speedtest1_s": 2.4725561179998294}
+{"round": 0, "bin": "zstd-lto", "zstd_L1_comp_MBs": 313.6, "zstd_L1_decomp_MBs": 754.8, "zstd_L3_comp_MBs": 184.5, "zstd_L3_decomp_MBs": 587.1}
+{"round": 0, "bin": "lua-nonull", "lua_closures_s": 0.7884204050001244, "lua_fib_s": 0.8307683740003995, "lua_nbody_s": 1.5716694669999924, "lua_spectral_s": 0.6580328299996836, "lua_strings_s": 0.7062579749999713, "lua_tables_s": 1.984256921999986}
+{"round": 0, "bin": "lua_one-lto", "lua_closures_s": 0.6885555210001257, "lua_fib_s": 0.7731522899998708, "lua_nbody_s": 1.5080960430000232, "lua_spectral_s": 0.5781454049997592, "lua_strings_s": 0.635746804000064, "lua_tables_s": 1.8119061129996226}
+{"round": 0, "bin": "sqlite-nobuiltin", "sqlite_speedtest1_s": 2.6688456219999352}
+{"round": 0, "bin": "sqlite-lto", "sqlite_speedtest1_s": 2.414083478000066}
+{"round": 0, "bin": "zstd-kernel", "zstd_L1_comp_MBs": 328.6, "zstd_L1_decomp_MBs": 885.3, "zstd_L3_comp_MBs": 182.2, "zstd_L3_decomp_MBs": 602.5}
+{"round": 0, "bin": "lua-noerrno", "lua_closures_s": 0.7961573699999462, "lua_fib_s": 0.7566008320000037, "lua_nbody_s": 1.4382405179999296, "lua_spectral_s": 0.5440086769999652, "lua_strings_s": 0.5489754559998801, "lua_tables_s": 1.730931397000404}
+{"round": 0, "bin": "sqlite_sep-lto", "sqlite_speedtest1_s": 2.3685831180000605}
+{"round": 0, "bin": "lua-wrapv", "lua_closures_s": 0.6834149679998518, "lua_fib_s": 0.761484849000226, "lua_nbody_s": 1.4637744530000418, "lua_spectral_s": 0.5871111550000023, "lua_strings_s": 0.6785228199996709, "lua_tables_s": 2.2770191649997287}
+{"round": 0, "bin": "lua-fastmath", "lua_closures_s": 0.7531439570002476, "lua_fib_s": 0.8266710409998268, "lua_nbody_s": 1.3632379480000054, "lua_spectral_s": 0.5725607310000669, "lua_strings_s": 0.6714774380002382, "lua_tables_s": 1.9251918309996654}
+{"round": 0, "bin": "zstd-nosa", "zstd_L1_comp_MBs": 310.5, "zstd_L1_decomp_MBs": 882.9, "zstd_L3_comp_MBs": 171.8, "zstd_L3_decomp_MBs": 627.6}
+{"round": 0, "bin": "sqlite_sep-base", "sqlite_speedtest1_s": 2.489987567999833}
+{"round": 0, "bin": "sqlite-base", "sqlite_speedtest1_s": 2.4842705569999453}
+{"round": 0, "bin": "zstd-wrapv", "zstd_L1_comp_MBs": 317.0, "zstd_L1_decomp_MBs": 834.8, "zstd_L3_comp_MBs": 168.5, "zstd_L3_decomp_MBs": 636.9}
+{"round": 0, "bin": "sqlite-nonull", "sqlite_speedtest1_s": 2.3530652320000627}
+{"round": 0, "bin": "zstd-fastmath", "zstd_L1_comp_MBs": 320.8, "zstd_L1_decomp_MBs": 787.2, "zstd_L3_comp_MBs": 186.8, "zstd_L3_decomp_MBs": 650.8}
+{"round": 0, "bin": "lua-ctrl", "lua_closures_s": 0.7203578950002338, "lua_fib_s": 0.7310823079997135, "lua_nbody_s": 1.4375224390000767, "lua_spectral_s": 0.5832492250001451, "lua_strings_s": 0.6336509389998355, "lua_tables_s": 1.8858591250000245}
+{"round": 0, "bin": "lua-kernel", "lua_closures_s": 0.7152954690000115, "lua_fib_s": 0.7232007220000014, "lua_nbody_s": 1.499124072000086, "lua_spectral_s": 0.5563653270000941, "lua_strings_s": 0.6636206780003704, "lua_tables_s": 2.015137780999794}
+{"round": 0, "bin": "zstd-ctrl", "zstd_L1_comp_MBs": 319.9, "zstd_L1_decomp_MBs": 860.8, "zstd_L3_comp_MBs": 176.6, "zstd_L3_decomp_MBs": 632.9}
+{"round": 0, "bin": "sqlite-wrapv", "sqlite_speedtest1_s": 2.3594273340004293}
+{"round": 0, "bin": "lua-lto", "lua_closures_s": 0.7019608420000623, "lua_fib_s": 0.8002823599999829, "lua_nbody_s": 1.547359411999878, "lua_spectral_s": 0.6282878080000955, "lua_strings_s": 0.6787691089998589, "lua_tables_s": 1.7487545580002006}
+{"round": 0, "bin": "zstd-nofinite", "zstd_L1_comp_MBs": 298.5, "zstd_L1_decomp_MBs": 825.4, "zstd_L3_comp_MBs": 184.0, "zstd_L3_decomp_MBs": 645.8}
+{"round": 0, "bin": "lua-nobuiltin", "lua_closures_s": 0.7409146810000493, "lua_fib_s": 0.7933932339997227, "lua_nbody_s": 1.6276563040000838, "lua_spectral_s": 0.5840231010001844, "lua_strings_s": 0.5804047249998803, "lua_tables_s": 1.877496611999959}
+{"round": 0, "bin": "lua-native", "lua_closures_s": 0.6927005719999215, "lua_fib_s": 0.8062885069998629, "lua_nbody_s": 1.4261846290000904, "lua_spectral_s": 0.5845647420001114, "lua_strings_s": 0.6715349769997374, "lua_tables_s": 1.9934758630001852}
+{"round": 0, "bin": "zstd-native", "zstd_L1_comp_MBs": 306.7, "zstd_L1_decomp_MBs": 651.8, "zstd_L3_comp_MBs": 188.1, "zstd_L3_decomp_MBs": 538.1}
+{"round": 0, "bin": "lua-nosa", "lua_closures_s": 0.7232764740001585, "lua_fib_s": 0.7273999140002161, "lua_nbody_s": 1.321738392000043, "lua_spectral_s": 0.5492179569996551, "lua_strings_s": 0.572601912999744, "lua_tables_s": 1.7480017440002484}
+{"round": 0, "bin": "sqlite-kernel", "sqlite_speedtest1_s": 2.427525284999774}
+{"round": 1, "bin": "sqlite-nobuiltin", "sqlite_speedtest1_s": 2.4274430169998595}
+{"round": 1, "bin": "lua-nosa", "lua_closures_s": 0.6965709149999384, "lua_fib_s": 0.788444571999662, "lua_nbody_s": 1.5894594430001234, "lua_spectral_s": 0.5944039159999193, "lua_strings_s": 0.6656695480000963, "lua_tables_s": 1.9742859359998874}
+{"round": 1, "bin": "zstd-wrapv", "zstd_L1_comp_MBs": 317.5, "zstd_L1_decomp_MBs": 793.8, "zstd_L3_comp_MBs": 189.6, "zstd_L3_decomp_MBs": 689.7}
+{"round": 1, "bin": "lua-noerrno", "lua_closures_s": 0.6776710550002463, "lua_fib_s": 0.7595005490002222, "lua_nbody_s": 1.4189866479996454, "lua_spectral_s": 0.6206755620000877, "lua_strings_s": 0.666309573000035, "lua_tables_s": 1.7137046570001075}
+{"round": 1, "bin": "lua_one-base", "lua_closures_s": 0.6439073559999997, "lua_fib_s": 0.690136985999743, "lua_nbody_s": 1.5165955440002108, "lua_spectral_s": 0.6278351579999253, "lua_strings_s": 0.5614052589999119, "lua_tables_s": 1.4916923310001948}
+{"round": 1, "bin": "lua-lto", "lua_closures_s": 0.636227706000227, "lua_fib_s": 0.7339050590003353, "lua_nbody_s": 1.5710203570001795, "lua_spectral_s": 0.5370642409998254, "lua_strings_s": 0.5889140180001959, "lua_tables_s": 1.5488010849999228}
+{"round": 1, "bin": "zstd-kernel", "zstd_L1_comp_MBs": 331.5, "zstd_L1_decomp_MBs": 869.0, "zstd_L3_comp_MBs": 189.0, "zstd_L3_decomp_MBs": 706.6}
+{"round": 1, "bin": "sqlite-base", "sqlite_speedtest1_s": 2.2992007679999915}
+{"round": 1, "bin": "sqlite-ctrl", "sqlite_speedtest1_s": 2.267047803999958}
+{"round": 1, "bin": "zstd-nobuiltin", "zstd_L1_comp_MBs": 332.4, "zstd_L1_decomp_MBs": 862.3, "zstd_L3_comp_MBs": 191.3, "zstd_L3_decomp_MBs": 677.4}
+{"round": 1, "bin": "zstd-fastmath", "zstd_L1_comp_MBs": 312.5, "zstd_L1_decomp_MBs": 783.6, "zstd_L3_comp_MBs": 190.9, "zstd_L3_decomp_MBs": 666.1}
+{"round": 1, "bin": "sqlite_sep-lto", "sqlite_speedtest1_s": 2.293622506000247}
+{"round": 1, "bin": "sqlite-native", "sqlite_speedtest1_s": 2.2598954480004068}
+{"round": 1, "bin": "lua-kernel", "lua_closures_s": 0.6747142359999998, "lua_fib_s": 0.7177941270001611, "lua_nbody_s": 1.5784996289999071, "lua_spectral_s": 0.5487360770002851, "lua_strings_s": 0.5538786719998825, "lua_tables_s": 1.8878441619999649}
+{"round": 1, "bin": "sqlite-kernel", "sqlite_speedtest1_s": 2.434834504999799}
+{"round": 1, "bin": "zstd-nosa", "zstd_L1_comp_MBs": 312.1, "zstd_L1_decomp_MBs": 868.5, "zstd_L3_comp_MBs": 187.1, "zstd_L3_decomp_MBs": 681.7}
+{"round": 1, "bin": "lua-fastmath", "lua_closures_s": 0.6628794499997639, "lua_fib_s": 0.7862442380001085, "lua_nbody_s": 1.4129365280000457, "lua_spectral_s": 0.6252705639999476, "lua_strings_s": 0.6371781809998538, "lua_tables_s": 2.0776106940002137}
+{"round": 1, "bin": "zstd-nonull", "zstd_L1_comp_MBs": 280.8, "zstd_L1_decomp_MBs": 848.1, "zstd_L3_comp_MBs": 183.2, "zstd_L3_decomp_MBs": 629.7}
+{"round": 1, "bin": "lua-nobuiltin", "lua_closures_s": 0.701643292999961, "lua_fib_s": 0.7838067689999662, "lua_nbody_s": 1.5521194259999902, "lua_spectral_s": 0.5987703949999741, "lua_strings_s": 0.6308921230001943, "lua_tables_s": 1.9681902870001977}
+{"round": 1, "bin": "lua-nonull", "lua_closures_s": 0.6988309220000701, "lua_fib_s": 0.7900079879996156, "lua_nbody_s": 1.5612031850000676, "lua_spectral_s": 0.5657927769998423, "lua_strings_s": 0.6071084559998781, "lua_tables_s": 1.920316597999772}
+{"round": 1, "bin": "lua-ctrl", "lua_closures_s": 0.6950379320001048, "lua_fib_s": 0.727760902999762, "lua_nbody_s": 1.4848584149999624, "lua_spectral_s": 0.6350766949999525, "lua_strings_s": 0.6609732920001079, "lua_tables_s": 1.8131595099998776}
+{"round": 1, "bin": "lua-native", "lua_closures_s": 0.6656138299999839, "lua_fib_s": 0.777047586000208, "lua_nbody_s": 1.368516014999841, "lua_spectral_s": 0.5332290179999291, "lua_strings_s": 0.6980432389996167, "lua_tables_s": 2.0212766259996897}
+{"round": 1, "bin": "sqlite-wrapv", "sqlite_speedtest1_s": 2.5396313989999726}
+{"round": 1, "bin": "lua-base", "lua_closures_s": 0.7155105980000371, "lua_fib_s": 0.7506457489998866, "lua_nbody_s": 1.5147275970002738, "lua_spectral_s": 0.6582507709999845, "lua_strings_s": 0.6200123849998818, "lua_tables_s": 1.7881899999997586}
+{"round": 1, "bin": "sqlite-nosa", "sqlite_speedtest1_s": 2.540978965999784}
+{"round": 1, "bin": "lua_one-lto", "lua_closures_s": 0.6968083149999984, "lua_fib_s": 0.7178340469999966, "lua_nbody_s": 1.4675188799997159, "lua_spectral_s": 0.5822221859998535, "lua_strings_s": 0.616920293000021, "lua_tables_s": 1.638133222000306}
+{"round": 1, "bin": "zstd-base", "zstd_L1_comp_MBs": 325.3, "zstd_L1_decomp_MBs": 864.3, "zstd_L3_comp_MBs": 193.7, "zstd_L3_decomp_MBs": 657.5}
+{"round": 1, "bin": "zstd-nofinite", "zstd_L1_comp_MBs": 321.8, "zstd_L1_decomp_MBs": 799.5, "zstd_L3_comp_MBs": 164.6, "zstd_L3_decomp_MBs": 657.5}
+{"round": 1, "bin": "sqlite_sep-base", "sqlite_speedtest1_s": 2.614812515000267}
+{"round": 1, "bin": "sqlite-fastmath", "sqlite_speedtest1_s": 2.4623107170000367}
+{"round": 1, "bin": "zstd-lto", "zstd_L1_comp_MBs": 320.6, "zstd_L1_decomp_MBs": 813.7, "zstd_L3_comp_MBs": 183.6, "zstd_L3_decomp_MBs": 582.9}
+{"round": 1, "bin": "lua-wrapv", "lua_closures_s": 0.7021304520003468, "lua_fib_s": 0.7668730120003602, "lua_nbody_s": 1.5282516130000658, "lua_spectral_s": 0.5662471229998118, "lua_strings_s": 0.617751675999898, "lua_tables_s": 1.764968028000112}
+{"round": 1, "bin": "sqlite-lto", "sqlite_speedtest1_s": 2.3420018330002677}
+{"round": 1, "bin": "zstd-native", "zstd_L1_comp_MBs": 329.2, "zstd_L1_decomp_MBs": 614.5, "zstd_L3_comp_MBs": 199.7, "zstd_L3_decomp_MBs": 559.5}
+{"round": 1, "bin": "sqlite-nonull", "sqlite_speedtest1_s": 2.3781484370001635}
+{"round": 1, "bin": "sqlite-nofinite", "sqlite_speedtest1_s": 2.428774588000124}
+{"round": 1, "bin": "zstd-ctrl", "zstd_L1_comp_MBs": 300.3, "zstd_L1_decomp_MBs": 862.2, "zstd_L3_comp_MBs": 191.6, "zstd_L3_decomp_MBs": 676.2}
+{"round": 2, "bin": "lua-nosa", "lua_closures_s": 0.6898654449996684, "lua_fib_s": 0.7713270060003197, "lua_nbody_s": 1.383281203000024, "lua_spectral_s": 0.5825398800002404, "lua_strings_s": 0.6602297839999665, "lua_tables_s": 1.9581940970001597}
+{"round": 2, "bin": "sqlite-native", "sqlite_speedtest1_s": 2.4633173940001143}
+{"round": 2, "bin": "sqlite_sep-lto", "sqlite_speedtest1_s": 2.314079046000188}
+{"round": 2, "bin": "zstd-kernel", "zstd_L1_comp_MBs": 322.5, "zstd_L1_decomp_MBs": 745.1, "zstd_L3_comp_MBs": 193.9, "zstd_L3_decomp_MBs": 670.2}
+{"round": 2, "bin": "zstd-wrapv", "zstd_L1_comp_MBs": 326.6, "zstd_L1_decomp_MBs": 794.1, "zstd_L3_comp_MBs": 181.3, "zstd_L3_decomp_MBs": 586.6}
+{"round": 2, "bin": "sqlite_sep-base", "sqlite_speedtest1_s": 2.6077977250001823}
+{"round": 2, "bin": "sqlite-nosa", "sqlite_speedtest1_s": 2.5606944119999753}
+{"round": 2, "bin": "sqlite-ctrl", "sqlite_speedtest1_s": 2.4495245620000787}
+{"round": 2, "bin": "sqlite-nonull", "sqlite_speedtest1_s": 2.553049449000355}
+{"round": 2, "bin": "lua-ctrl", "lua_closures_s": 0.7087923419999242, "lua_fib_s": 0.748186793000059, "lua_nbody_s": 1.3951979480002592, "lua_spectral_s": 0.564927187000194, "lua_strings_s": 0.6372983659998681, "lua_tables_s": 1.8577492809999967}
+{"round": 2, "bin": "lua_one-base", "lua_closures_s": 0.6813239130001421, "lua_fib_s": 0.711442242999965, "lua_nbody_s": 1.549618012999872, "lua_spectral_s": 0.6174915530000362, "lua_strings_s": 0.5934243540000352, "lua_tables_s": 1.7934019600002102}
+{"round": 2, "bin": "lua-base", "lua_closures_s": 0.6604234129999895, "lua_fib_s": 0.8354040879999047, "lua_nbody_s": 1.4264119280001069, "lua_spectral_s": 0.5553177109995886, "lua_strings_s": 0.677186189999702, "lua_tables_s": 2.0033314879997306}
+{"round": 2, "bin": "zstd-nofinite", "zstd_L1_comp_MBs": 306.3, "zstd_L1_decomp_MBs": 838.9, "zstd_L3_comp_MBs": 189.2, "zstd_L3_decomp_MBs": 643.5}
+{"round": 2, "bin": "zstd-nosa", "zstd_L1_comp_MBs": 305.9, "zstd_L1_decomp_MBs": 893.8, "zstd_L3_comp_MBs": 176.0, "zstd_L3_decomp_MBs": 656.2}
+{"round": 2, "bin": "zstd-lto", "zstd_L1_comp_MBs": 311.9, "zstd_L1_decomp_MBs": 815.2, "zstd_L3_comp_MBs": 194.1, "zstd_L3_decomp_MBs": 664.6}
+{"round": 2, "bin": "lua-wrapv", "lua_closures_s": 0.6554591600001913, "lua_fib_s": 0.7736417300002358, "lua_nbody_s": 1.4706116199999997, "lua_spectral_s": 0.6064876129998993, "lua_strings_s": 0.6695993849998558, "lua_tables_s": 1.8306244339996738}
+{"round": 2, "bin": "zstd-base", "zstd_L1_comp_MBs": 315.6, "zstd_L1_decomp_MBs": 830.1, "zstd_L3_comp_MBs": 179.7, "zstd_L3_decomp_MBs": 625.8}
+{"round": 2, "bin": "sqlite-base", "sqlite_speedtest1_s": 2.3678896010001154}
+{"round": 2, "bin": "lua-native", "lua_closures_s": 0.6487075810000533, "lua_fib_s": 0.7059786549998535, "lua_nbody_s": 1.3392387419999068, "lua_spectral_s": 0.549626723000074, "lua_strings_s": 0.6289135120000537, "lua_tables_s": 1.7907704819999708}
+{"round": 2, "bin": "zstd-nobuiltin", "zstd_L1_comp_MBs": 315.3, "zstd_L1_decomp_MBs": 866.0, "zstd_L3_comp_MBs": 186.8, "zstd_L3_decomp_MBs": 667.1}
+{"round": 2, "bin": "lua-nobuiltin", "lua_closures_s": 0.7212263510000412, "lua_fib_s": 0.8769245039998168, "lua_nbody_s": 1.557970621000095, "lua_spectral_s": 0.5961020070003542, "lua_strings_s": 0.6993518519998361, "lua_tables_s": 1.83448849899969}
+{"round": 2, "bin": "zstd-nonull", "zstd_L1_comp_MBs": 325.0, "zstd_L1_decomp_MBs": 807.3, "zstd_L3_comp_MBs": 195.3, "zstd_L3_decomp_MBs": 678.8}
+{"round": 2, "bin": "zstd-native", "zstd_L1_comp_MBs": 313.1, "zstd_L1_decomp_MBs": 614.8, "zstd_L3_comp_MBs": 178.4, "zstd_L3_decomp_MBs": 524.1}
+{"round": 2, "bin": "sqlite-lto", "sqlite_speedtest1_s": 2.4459497299999384}
+{"round": 2, "bin": "sqlite-wrapv", "sqlite_speedtest1_s": 2.508780382000168}
+{"round": 2, "bin": "sqlite-kernel", "sqlite_speedtest1_s": 2.4836077290001413}
+{"round": 2, "bin": "lua_one-lto", "lua_closures_s": 0.7313870210000459, "lua_fib_s": 0.79467641500014, "lua_nbody_s": 1.7137979090002773, "lua_spectral_s": 0.5840540189997228, "lua_strings_s": 0.6409348450001744, "lua_tables_s": 1.9131262939999942}
+{"round": 2, "bin": "lua-fastmath", "lua_closures_s": 0.669454733999828, "lua_fib_s": 0.8608075959996313, "lua_nbody_s": 1.441427707999992, "lua_spectral_s": 0.5612128419998044, "lua_strings_s": 0.599158763000105, "lua_tables_s": 1.918727147000027}
+{"round": 2, "bin": "lua-kernel", "lua_closures_s": 0.677843354000288, "lua_fib_s": 0.7471179730000586, "lua_nbody_s": 1.407937469999979, "lua_spectral_s": 0.6406471979998969, "lua_strings_s": 0.675358721000066, "lua_tables_s": 2.0572433550000824}
+{"round": 2, "bin": "zstd-fastmath", "zstd_L1_comp_MBs": 319.9, "zstd_L1_decomp_MBs": 821.9, "zstd_L3_comp_MBs": 188.9, "zstd_L3_decomp_MBs": 673.4}
+{"round": 2, "bin": "lua-nonull", "lua_closures_s": 0.7118251639999471, "lua_fib_s": 0.7678892919998361, "lua_nbody_s": 1.6695188799999414, "lua_spectral_s": 0.7136551049998161, "lua_strings_s": 0.7079122540003482, "lua_tables_s": 1.643840530000034}
+{"round": 2, "bin": "lua-noerrno", "lua_closures_s": 0.6528646060000938, "lua_fib_s": 0.7082597049998185, "lua_nbody_s": 1.5890546900000118, "lua_spectral_s": 0.5802164299998367, "lua_strings_s": 0.6874528409998675, "lua_tables_s": 1.7948613190001197}
+{"round": 2, "bin": "sqlite-nofinite", "sqlite_speedtest1_s": 2.462072249999892}
+{"round": 2, "bin": "sqlite-fastmath", "sqlite_speedtest1_s": 2.5537403849998555}
+{"round": 2, "bin": "zstd-ctrl", "zstd_L1_comp_MBs": 296.6, "zstd_L1_decomp_MBs": 814.9, "zstd_L3_comp_MBs": 179.9, "zstd_L3_decomp_MBs": 617.3}
+{"round": 2, "bin": "lua-lto", "lua_closures_s": 0.7316173429999253, "lua_fib_s": 0.8690249400001449, "lua_nbody_s": 1.6060061499997573, "lua_spectral_s": 0.5486281570001665, "lua_strings_s": 0.7021850240003005, "lua_tables_s": 1.9270224459996825}
+{"round": 2, "bin": "sqlite-nobuiltin", "sqlite_speedtest1_s": 2.4561040200001116}
+{"round": 3, "bin": "zstd-nonull", "zstd_L1_comp_MBs": 316.5, "zstd_L1_decomp_MBs": 771.3, "zstd_L3_comp_MBs": 186.9, "zstd_L3_decomp_MBs": 643.4}
+{"round": 3, "bin": "sqlite-kernel", "sqlite_speedtest1_s": 2.476969333999932}
+{"round": 3, "bin": "lua-native", "lua_closures_s": 0.707799046999753, "lua_fib_s": 0.7816741860001457, "lua_nbody_s": 1.337998652999886, "lua_spectral_s": 0.6728565680000429, "lua_strings_s": 0.6769241150000198, "lua_tables_s": 1.9559285549999004}
+{"round": 3, "bin": "lua-nonull", "lua_closures_s": 0.7433243749997018, "lua_fib_s": 0.7874590850001368, "lua_nbody_s": 1.731194487999801, "lua_spectral_s": 0.6553303129999222, "lua_strings_s": 0.6564049840003463, "lua_tables_s": 1.90765755800021}
+{"round": 3, "bin": "sqlite-nofinite", "sqlite_speedtest1_s": 2.4818880640000316}
+{"round": 3, "bin": "zstd-nobuiltin", "zstd_L1_comp_MBs": 326.7, "zstd_L1_decomp_MBs": 817.4, "zstd_L3_comp_MBs": 186.1, "zstd_L3_decomp_MBs": 678.6}
+{"round": 3, "bin": "sqlite_sep-base", "sqlite_speedtest1_s": 2.5325281109999196}
+{"round": 3, "bin": "sqlite-ctrl", "sqlite_speedtest1_s": 2.3952197769999657}
+{"round": 3, "bin": "zstd-nofinite", "zstd_L1_comp_MBs": 332.0, "zstd_L1_decomp_MBs": 831.4, "zstd_L3_comp_MBs": 170.7, "zstd_L3_decomp_MBs": 665.5}
+{"round": 3, "bin": "sqlite-nosa", "sqlite_speedtest1_s": 2.498545576000197}
+{"round": 3, "bin": "lua-ctrl", "lua_closures_s": 0.6426324290000593, "lua_fib_s": 0.7312515270000404, "lua_nbody_s": 1.341302904999793, "lua_spectral_s": 0.5472223430001577, "lua_strings_s": 0.6772254459997384, "lua_tables_s": 1.945632797000144}
+{"round": 3, "bin": "zstd-wrapv", "zstd_L1_comp_MBs": 298.4, "zstd_L1_decomp_MBs": 781.1, "zstd_L3_comp_MBs": 170.2, "zstd_L3_decomp_MBs": 653.5}
+{"round": 3, "bin": "zstd-base", "zstd_L1_comp_MBs": 310.8, "zstd_L1_decomp_MBs": 803.9, "zstd_L3_comp_MBs": 165.8, "zstd_L3_decomp_MBs": 620.6}
+{"round": 3, "bin": "zstd-lto", "zstd_L1_comp_MBs": 309.5, "zstd_L1_decomp_MBs": 823.3, "zstd_L3_comp_MBs": 195.0, "zstd_L3_decomp_MBs": 569.0}
+{"round": 3, "bin": "zstd-ctrl", "zstd_L1_comp_MBs": 331.2, "zstd_L1_decomp_MBs": 814.9, "zstd_L3_comp_MBs": 190.3, "zstd_L3_decomp_MBs": 697.5}
+{"round": 3, "bin": "sqlite-fastmath", "sqlite_speedtest1_s": 2.290771305999897}
+{"round": 3, "bin": "lua-nosa", "lua_closures_s": 0.7181484779998755, "lua_fib_s": 0.774258276999717, "lua_nbody_s": 1.4777760440001657, "lua_spectral_s": 0.5837278270000752, "lua_strings_s": 0.6290954729997793, "lua_tables_s": 1.7663400470000852}
+{"round": 3, "bin": "zstd-nosa", "zstd_L1_comp_MBs": 324.3, "zstd_L1_decomp_MBs": 882.3, "zstd_L3_comp_MBs": 180.6, "zstd_L3_decomp_MBs": 670.4}
+{"round": 3, "bin": "sqlite-lto", "sqlite_speedtest1_s": 2.516999098999804}
+{"round": 3, "bin": "lua-base", "lua_closures_s": 0.7247139940000125, "lua_fib_s": 0.7436889499999779, "lua_nbody_s": 1.4109371569998075, "lua_spectral_s": 0.5689366439996775, "lua_strings_s": 0.6513435570000183, "lua_tables_s": 1.9499988460001987}
+{"round": 3, "bin": "lua-kernel", "lua_closures_s": 0.6457034340000973, "lua_fib_s": 0.7084441679999145, "lua_nbody_s": 1.5535379610000746, "lua_spectral_s": 0.6646637489998284, "lua_strings_s": 0.6212202520000574, "lua_tables_s": 1.8096105899999202}
+{"round": 3, "bin": "lua-noerrno", "lua_closures_s": 0.6697071859998687, "lua_fib_s": 0.7311460600003556, "lua_nbody_s": 1.4670978290000676, "lua_spectral_s": 0.5803378040000098, "lua_strings_s": 0.7134198120002111, "lua_tables_s": 1.9215674500001114}
+{"round": 3, "bin": "sqlite-native", "sqlite_speedtest1_s": 2.527679877999617}
+{"round": 3, "bin": "lua_one-lto", "lua_closures_s": 0.6740688159998172, "lua_fib_s": 0.7712213059999158, "lua_nbody_s": 1.6923572320001767, "lua_spectral_s": 0.5946415809999053, "lua_strings_s": 0.6600428420001663, "lua_tables_s": 1.760362969000198}
+{"round": 3, "bin": "zstd-kernel", "zstd_L1_comp_MBs": 299.4, "zstd_L1_decomp_MBs": 819.0, "zstd_L3_comp_MBs": 173.1, "zstd_L3_decomp_MBs": 708.3}
+{"round": 3, "bin": "sqlite-nobuiltin", "sqlite_speedtest1_s": 2.445041790000232}
+{"round": 3, "bin": "zstd-fastmath", "zstd_L1_comp_MBs": 321.8, "zstd_L1_decomp_MBs": 803.0, "zstd_L3_comp_MBs": 184.1, "zstd_L3_decomp_MBs": 655.1}
+{"round": 3, "bin": "sqlite-base", "sqlite_speedtest1_s": 2.4924046950000047}
+{"round": 3, "bin": "lua-nobuiltin", "lua_closures_s": 0.7346081400000912, "lua_fib_s": 0.8282566009997936, "lua_nbody_s": 1.7774482159998115, "lua_spectral_s": 0.6166991410000264, "lua_strings_s": 0.6834733270002289, "lua_tables_s": 1.8258400280001297}
+{"round": 3, "bin": "sqlite_sep-lto", "sqlite_speedtest1_s": 2.301348058000258}
+{"round": 3, "bin": "zstd-native", "zstd_L1_comp_MBs": 337.9, "zstd_L1_decomp_MBs": 661.2, "zstd_L3_comp_MBs": 195.1, "zstd_L3_decomp_MBs": 583.9}
+{"round": 3, "bin": "lua-fastmath", "lua_closures_s": 0.6573599809998996, "lua_fib_s": 0.7924889230002918, "lua_nbody_s": 1.398411734000092, "lua_spectral_s": 0.5844892029999755, "lua_strings_s": 0.6742854130002343, "lua_tables_s": 1.8743412090002494}
+{"round": 3, "bin": "lua_one-base", "lua_closures_s": 0.7431476510000721, "lua_fib_s": 0.6967394069997681, "lua_nbody_s": 1.4569959989999006, "lua_spectral_s": 0.5808362029997625, "lua_strings_s": 0.5715871620000144, "lua_tables_s": 1.9409971370000676}
+{"round": 3, "bin": "sqlite-nonull", "sqlite_speedtest1_s": 2.4788999789998343}
+{"round": 3, "bin": "lua-lto", "lua_closures_s": 0.6657064490000266, "lua_fib_s": 0.7359278760000052, "lua_nbody_s": 1.4327113370000006, "lua_spectral_s": 0.558746985000198, "lua_strings_s": 0.7252810639997733, "lua_tables_s": 1.774401484000009}
+{"round": 3, "bin": "lua-wrapv", "lua_closures_s": 0.712646414000119, "lua_fib_s": 0.733041546000095, "lua_nbody_s": 1.4488856230000238, "lua_spectral_s": 0.5693190290003258, "lua_strings_s": 0.6393259609999404, "lua_tables_s": 1.8385648700000274}
+{"round": 3, "bin": "sqlite-wrapv", "sqlite_speedtest1_s": 2.4314548520001154}
+{"round": 4, "bin": "lua-ctrl", "lua_closures_s": 0.7424647150000965, "lua_fib_s": 0.8791734960000213, "lua_nbody_s": 1.4520817600000555, "lua_spectral_s": 0.6038343559998793, "lua_strings_s": 0.6521391329997641, "lua_tables_s": 1.7592168870000933}
+{"round": 4, "bin": "sqlite-fastmath", "sqlite_speedtest1_s": 2.2927307999998447}
+{"round": 4, "bin": "lua-lto", "lua_closures_s": 0.6286162789997434, "lua_fib_s": 0.7514669649999632, "lua_nbody_s": 1.4744907409999541, "lua_spectral_s": 0.6100902920002227, "lua_strings_s": 0.6383043619998716, "lua_tables_s": 1.7734595649999392}
+{"round": 4, "bin": "sqlite-nonull", "sqlite_speedtest1_s": 2.4503201829998034}
+{"round": 4, "bin": "zstd-nofinite", "zstd_L1_comp_MBs": 289.3, "zstd_L1_decomp_MBs": 782.5, "zstd_L3_comp_MBs": 177.3, "zstd_L3_decomp_MBs": 642.2}
+{"round": 4, "bin": "sqlite-nosa", "sqlite_speedtest1_s": 2.400101029000325}
+{"round": 4, "bin": "lua-noerrno", "lua_closures_s": 0.6575066059999699, "lua_fib_s": 0.7792413849997502, "lua_nbody_s": 1.4605337999996664, "lua_spectral_s": 0.5553369029998976, "lua_strings_s": 0.6004439100001946, "lua_tables_s": 1.7397645280002507}
+{"round": 4, "bin": "sqlite_sep-lto", "sqlite_speedtest1_s": 2.4065466209999613}
+{"round": 4, "bin": "lua-nobuiltin", "lua_closures_s": 0.693753027999719, "lua_fib_s": 0.7739450990002297, "lua_nbody_s": 1.616988742999638, "lua_spectral_s": 0.6420028019997517, "lua_strings_s": 0.6165330059998269, "lua_tables_s": 1.8742651620000288}
+{"round": 4, "bin": "lua-kernel", "lua_closures_s": 0.7204407570002331, "lua_fib_s": 0.7452651899998273, "lua_nbody_s": 1.4151674400000047, "lua_spectral_s": 0.5631171799996082, "lua_strings_s": 0.6016579199999796, "lua_tables_s": 1.8416876420001245}
+{"round": 4, "bin": "zstd-fastmath", "zstd_L1_comp_MBs": 301.6, "zstd_L1_decomp_MBs": 820.3, "zstd_L3_comp_MBs": 178.5, "zstd_L3_decomp_MBs": 620.0}
+{"round": 4, "bin": "zstd-nonull", "zstd_L1_comp_MBs": 298.7, "zstd_L1_decomp_MBs": 770.5, "zstd_L3_comp_MBs": 187.7, "zstd_L3_decomp_MBs": 599.1}
+{"round": 4, "bin": "lua-nosa", "lua_closures_s": 0.6608411920001345, "lua_fib_s": 0.7235448379997251, "lua_nbody_s": 1.4451134820001243, "lua_spectral_s": 0.5564580260002003, "lua_strings_s": 0.715671490999739, "lua_tables_s": 1.9638557940002102}
+{"round": 4, "bin": "lua-native", "lua_closures_s": 0.7905333759999849, "lua_fib_s": 0.7995940159999009, "lua_nbody_s": 1.3351004579999426, "lua_spectral_s": 0.5626211940002577, "lua_strings_s": 0.6187163800000235, "lua_tables_s": 1.9292855049998252}
+{"round": 4, "bin": "zstd-wrapv", "zstd_L1_comp_MBs": 333.7, "zstd_L1_decomp_MBs": 850.8, "zstd_L3_comp_MBs": 180.4, "zstd_L3_decomp_MBs": 660.7}
+{"round": 4, "bin": "zstd-nobuiltin", "zstd_L1_comp_MBs": 323.3, "zstd_L1_decomp_MBs": 827.7, "zstd_L3_comp_MBs": 189.0, "zstd_L3_decomp_MBs": 662.0}
+{"round": 4, "bin": "zstd-lto", "zstd_L1_comp_MBs": 326.7, "zstd_L1_decomp_MBs": 822.9, "zstd_L3_comp_MBs": 194.6, "zstd_L3_decomp_MBs": 651.3}
+{"round": 4, "bin": "zstd-native", "zstd_L1_comp_MBs": 333.5, "zstd_L1_decomp_MBs": 624.2, "zstd_L3_comp_MBs": 180.9, "zstd_L3_decomp_MBs": 533.8}
+{"round": 4, "bin": "zstd-nosa", "zstd_L1_comp_MBs": 328.0, "zstd_L1_decomp_MBs": 825.1, "zstd_L3_comp_MBs": 179.5, "zstd_L3_decomp_MBs": 641.6}
+{"round": 4, "bin": "lua_one-lto", "lua_closures_s": 0.7969148040001528, "lua_fib_s": 0.7545278510001481, "lua_nbody_s": 1.5631309250002232, "lua_spectral_s": 0.644244513999638, "lua_strings_s": 0.6401656030002414, "lua_tables_s": 1.818557569999939}
+{"round": 4, "bin": "lua_one-base", "lua_closures_s": 0.6846511479998298, "lua_fib_s": 0.7593116610000834, "lua_nbody_s": 1.539753570999892, "lua_spectral_s": 0.6067862140002944, "lua_strings_s": 0.5985110689998692, "lua_tables_s": 1.6305316410002888}
+{"round": 4, "bin": "sqlite-native", "sqlite_speedtest1_s": 2.3290658579999217}
+{"round": 4, "bin": "lua-nonull", "lua_closures_s": 0.70014958999991, "lua_fib_s": 0.7476283850000982, "lua_nbody_s": 1.6059369669997068, "lua_spectral_s": 0.5996875410000939, "lua_strings_s": 0.6261746639997909, "lua_tables_s": 1.8434447700001328}
+{"round": 4, "bin": "sqlite-nobuiltin", "sqlite_speedtest1_s": 2.3420424280002408}
+{"round": 4, "bin": "sqlite-lto", "sqlite_speedtest1_s": 2.49100807800005}
+{"round": 4, "bin": "lua-base", "lua_closures_s": 0.7441979790000914, "lua_fib_s": 0.8147717269998793, "lua_nbody_s": 1.5289574760004143, "lua_spectral_s": 0.5481875519999448, "lua_strings_s": 0.6429027160002079, "lua_tables_s": 1.8387859399999797}
+{"round": 4, "bin": "zstd-kernel", "zstd_L1_comp_MBs": 317.9, "zstd_L1_decomp_MBs": 881.8, "zstd_L3_comp_MBs": 175.4, "zstd_L3_decomp_MBs": 693.0}
+{"round": 4, "bin": "zstd-base", "zstd_L1_comp_MBs": 313.6, "zstd_L1_decomp_MBs": 819.0, "zstd_L3_comp_MBs": 179.4, "zstd_L3_decomp_MBs": 653.6}
+{"round": 4, "bin": "sqlite-nofinite", "sqlite_speedtest1_s": 2.4843152650000775}
+{"round": 4, "bin": "zstd-ctrl", "zstd_L1_comp_MBs": 319.8, "zstd_L1_decomp_MBs": 772.4, "zstd_L3_comp_MBs": 184.0, "zstd_L3_decomp_MBs": 689.8}
+{"round": 4, "bin": "lua-wrapv", "lua_closures_s": 0.705257187999905, "lua_fib_s": 0.8233724110000367, "lua_nbody_s": 1.3431700470000578, "lua_spectral_s": 0.5727739959997962, "lua_strings_s": 0.5957124050000857, "lua_tables_s": 1.848248347000208}
+{"round": 4, "bin": "sqlite-wrapv", "sqlite_speedtest1_s": 2.3868743960001666}
+{"round": 4, "bin": "sqlite-ctrl", "sqlite_speedtest1_s": 2.4300993439997}
+{"round": 4, "bin": "lua-fastmath", "lua_closures_s": 0.6809727449999627, "lua_fib_s": 0.7396370950000346, "lua_nbody_s": 1.4137332390000665, "lua_spectral_s": 0.607731880999836, "lua_strings_s": 0.7641166090002116, "lua_tables_s": 1.9465849660000458}
+{"round": 4, "bin": "sqlite-kernel", "sqlite_speedtest1_s": 2.378218666000066}
+{"round": 4, "bin": "sqlite-base", "sqlite_speedtest1_s": 2.404505560999951}
+{"round": 4, "bin": "sqlite_sep-base", "sqlite_speedtest1_s": 2.4830235929998707}
+{"round": 5, "bin": "lua-noerrno", "lua_closures_s": 0.7086347479998949, "lua_fib_s": 0.8113777990001836, "lua_nbody_s": 1.4836964289997923, "lua_spectral_s": 0.5912983960001839, "lua_strings_s": 0.6372448209999675, "lua_tables_s": 1.9347197960000813}
+{"round": 5, "bin": "sqlite-nobuiltin", "sqlite_speedtest1_s": 2.473853803000111}
+{"round": 5, "bin": "sqlite-fastmath", "sqlite_speedtest1_s": 2.4542264709998562}
+{"round": 5, "bin": "lua-lto", "lua_closures_s": 0.6824129370002083, "lua_fib_s": 0.7059020980000241, "lua_nbody_s": 1.4999311750002562, "lua_spectral_s": 0.559978855999816, "lua_strings_s": 0.6314234429996759, "lua_tables_s": 1.7238293809996321}
+{"round": 5, "bin": "zstd-nobuiltin", "zstd_L1_comp_MBs": 311.8, "zstd_L1_decomp_MBs": 846.6, "zstd_L3_comp_MBs": 191.4, "zstd_L3_decomp_MBs": 622.1}
+{"round": 5, "bin": "sqlite-lto", "sqlite_speedtest1_s": 2.3817911070000264}
+{"round": 5, "bin": "zstd-fastmath", "zstd_L1_comp_MBs": 311.5, "zstd_L1_decomp_MBs": 806.4, "zstd_L3_comp_MBs": 188.4, "zstd_L3_decomp_MBs": 668.0}
+{"round": 5, "bin": "zstd-nofinite", "zstd_L1_comp_MBs": 314.9, "zstd_L1_decomp_MBs": 833.9, "zstd_L3_comp_MBs": 183.8, "zstd_L3_decomp_MBs": 638.0}
+{"round": 5, "bin": "zstd-base", "zstd_L1_comp_MBs": 303.1, "zstd_L1_decomp_MBs": 739.5, "zstd_L3_comp_MBs": 178.2, "zstd_L3_decomp_MBs": 668.6}
+{"round": 5, "bin": "lua-native", "lua_closures_s": 0.6650875660002384, "lua_fib_s": 0.832925196999895, "lua_nbody_s": 1.3593270719998145, "lua_spectral_s": 0.5285210690003623, "lua_strings_s": 0.70774455999981, "lua_tables_s": 1.8863073160000567}
+{"round": 5, "bin": "lua_one-lto", "lua_closures_s": 0.6650437050002438, "lua_fib_s": 0.7323159590000614, "lua_nbody_s": 1.4035040839999056, "lua_spectral_s": 0.6316214349999427, "lua_strings_s": 0.6131794920001994, "lua_tables_s": 1.7026502700000492}
+{"round": 5, "bin": "zstd-lto", "zstd_L1_comp_MBs": 305.2, "zstd_L1_decomp_MBs": 796.9, "zstd_L3_comp_MBs": 189.6, "zstd_L3_decomp_MBs": 604.9}
+{"round": 5, "bin": "lua-wrapv", "lua_closures_s": 0.6603016429999116, "lua_fib_s": 0.7607072270002391, "lua_nbody_s": 1.4272768240002733, "lua_spectral_s": 0.6077952680002454, "lua_strings_s": 0.635428341000079, "lua_tables_s": 1.8516239629998381}
+{"round": 5, "bin": "sqlite-native", "sqlite_speedtest1_s": 2.4453356619997066}
+{"round": 5, "bin": "sqlite-nonull", "sqlite_speedtest1_s": 2.3869940310000857}
+{"round": 5, "bin": "sqlite-wrapv", "sqlite_speedtest1_s": 2.340122862000044}
+{"round": 5, "bin": "zstd-ctrl", "zstd_L1_comp_MBs": 320.2, "zstd_L1_decomp_MBs": 849.5, "zstd_L3_comp_MBs": 194.3, "zstd_L3_decomp_MBs": 653.7}
+{"round": 5, "bin": "zstd-nonull", "zstd_L1_comp_MBs": 324.0, "zstd_L1_decomp_MBs": 872.2, "zstd_L3_comp_MBs": 184.5, "zstd_L3_decomp_MBs": 678.7}
+{"round": 5, "bin": "sqlite_sep-base", "sqlite_speedtest1_s": 2.472389158000169}
+{"round": 5, "bin": "sqlite-nofinite", "sqlite_speedtest1_s": 2.343162475000099}
+{"round": 5, "bin": "zstd-native", "zstd_L1_comp_MBs": 338.5, "zstd_L1_decomp_MBs": 640.0, "zstd_L3_comp_MBs": 207.6, "zstd_L3_decomp_MBs": 587.4}
+{"round": 5, "bin": "sqlite_sep-lto", "sqlite_speedtest1_s": 2.3393294789998436}
+{"round": 5, "bin": "sqlite-ctrl", "sqlite_speedtest1_s": 2.4044226609998987}
+{"round": 5, "bin": "lua-kernel", "lua_closures_s": 0.7072208690001389, "lua_fib_s": 0.7525897890000124, "lua_nbody_s": 1.4483812840003338, "lua_spectral_s": 0.6035865359999661, "lua_strings_s": 0.7141416580002442, "lua_tables_s": 1.8982920789999298}
+{"round": 5, "bin": "lua_one-base", "lua_closures_s": 0.6750880750000761, "lua_fib_s": 0.7766041649997533, "lua_nbody_s": 1.4770257010000023, "lua_spectral_s": 0.6086160730001211, "lua_strings_s": 0.6516970180000499, "lua_tables_s": 1.5366636220001055}
+{"round": 5, "bin": "lua-nonull", "lua_closures_s": 0.6905550309998034, "lua_fib_s": 0.7643581870001981, "lua_nbody_s": 1.6356276569999864, "lua_spectral_s": 0.6063612040002226, "lua_strings_s": 0.5627999570001521, "lua_tables_s": 1.5874439940002958}
+{"round": 5, "bin": "lua-nobuiltin", "lua_closures_s": 0.6807145340003444, "lua_fib_s": 0.8064287960000911, "lua_nbody_s": 1.6576176300000043, "lua_spectral_s": 0.5911592239999663, "lua_strings_s": 0.6348628339997049, "lua_tables_s": 1.787976358999913}
+{"round": 5, "bin": "lua-base", "lua_closures_s": 0.6654858970000532, "lua_fib_s": 0.8528565849996994, "lua_nbody_s": 1.536140789000001, "lua_spectral_s": 0.5767493039998044, "lua_strings_s": 0.657038910999745, "lua_tables_s": 1.9547069290001673}
+{"round": 5, "bin": "zstd-kernel", "zstd_L1_comp_MBs": 323.7, "zstd_L1_decomp_MBs": 846.9, "zstd_L3_comp_MBs": 180.8, "zstd_L3_decomp_MBs": 631.6}
+{"round": 5, "bin": "zstd-wrapv", "zstd_L1_comp_MBs": 299.4, "zstd_L1_decomp_MBs": 770.6, "zstd_L3_comp_MBs": 187.3, "zstd_L3_decomp_MBs": 640.5}
+{"round": 5, "bin": "zstd-nosa", "zstd_L1_comp_MBs": 320.3, "zstd_L1_decomp_MBs": 812.1, "zstd_L3_comp_MBs": 171.5, "zstd_L3_decomp_MBs": 664.2}
+{"round": 5, "bin": "sqlite-kernel", "sqlite_speedtest1_s": 2.340252192999742}
+{"round": 5, "bin": "lua-nosa", "lua_closures_s": 0.6485234000001583, "lua_fib_s": 0.7126545520000036, "lua_nbody_s": 1.454398410000067, "lua_spectral_s": 0.5517903439999827, "lua_strings_s": 0.6223426920000747, "lua_tables_s": 1.7494160630003535}
+{"round": 5, "bin": "lua-fastmath", "lua_closures_s": 0.6668158420002328, "lua_fib_s": 0.7844007119997514, "lua_nbody_s": 1.5373273099999096, "lua_spectral_s": 0.6488024340001175, "lua_strings_s": 0.7492065960000218, "lua_tables_s": 2.0469338779998907}
+{"round": 5, "bin": "lua-ctrl", "lua_closures_s": 0.6930590819997633, "lua_fib_s": 0.7451020439998501, "lua_nbody_s": 1.3673048780001409, "lua_spectral_s": 0.5754692249997788, "lua_strings_s": 0.6331018759997278, "lua_tables_s": 1.9409456759999557}
+{"round": 5, "bin": "sqlite-nosa", "sqlite_speedtest1_s": 2.3912526780000007}
+{"round": 5, "bin": "sqlite-base", "sqlite_speedtest1_s": 2.3870999729997493}

@@ -46,6 +46,6 @@ Steps:
 
 2. Copy `luabench/` into `$WORK/abl/`, and put a `corpus.bin` there for zstd.
 
-3. Run `python3 bench.py <rounds>`, then `python3 analyze.py`.
+3. Run `python3 bench.py <rounds>`, then `python3 analyze.py` for per-metric results and `python3 summarize.py` for per-round composites. `results.jsonl` holds the raw data behind §5.
 
 Every run is pinned to CPU 3. Each variant is compared with its baseline from the same round.

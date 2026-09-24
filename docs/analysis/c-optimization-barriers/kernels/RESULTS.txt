@@ -1,0 +1,13 @@
+# Micro results (clang 23.1.2 official release, x86-64 baseline, -O2), Xeon 2.8GHz KVM 4 cores
+E01 restrict: both vectorized (VF4 IC2). no-restrict adds diff.check runtime check + prolog loop: asm 69 vs 36 lines. runtime (n=4096, no overlap): 0.110 vs 0.109 ns/elem -> no measurable diff.
+E02 char alias: fill_c (char* data in struct) reloads b->data and b->len every iteration, 1 byte store per iter, "loop not vectorized: cannot identify array bounds" + "Cannot vectorize uncountable loop". int* version hoists loads, vectorized <4 x i32> x2. Runtime: fill_c 0.474 ns/B vs fill_c_local (manually hoisted) 0.014 ns/B = 34x.
+E03 escape: local_escape reloads x after opaque(). global_counter load/store every iteration around opaque(). static_counter (internal, address never taken) ALSO load/store each iteration because opaque may re-enter externally visible count_static.
+E04 const: sum_twice(const int *p) reloads *p after opaque(); p gets readonly (callee-only) but no invariance.
+E05 index: int index+off -> invariant GEP, no scevcheck. unsigned index+off -> vector.scevcheck + trunc/add/zext per scalar iteration. int with -fwrapv -> also scevcheck. size_t -> no scevcheck.
+E06 errno: default: "loop not vectorized: library call cannot be vectorized. Try compiling with -fno-math-errno..." ; -fno-math-errno: vectorized VF2. Runtime 1.848 vs 0.920 ns/elem (2.0x).
+E07 FP reduction: "cannot prove it is safe to reorder floating-point operations"; int sum vectorized; with -fassociative-math -fno-signed-zeros -fno-trapping-math vectorized. Runtime 1.240 vs 0.153 ns/elem (8.1x).
+E08 inline: guarded (setjmp) "should never be inlined (cost=never): exposes returns twice"; sum_va "(cost=never): varargs"; plain inlined cost=-14995 threshold=337.
+E09 ABI: struct{double x,y} passed in 4 xmm regs; struct{double x,y,z} (24B) passed byval on stack: dot3 = 6 memory operands; add3 returns via sret pointer.
+E10 interposition: clang -fPIC default inlines helper (no dso_local but inlined); -fPIC -fsemantic-interposition: 2 PLT calls, no inlining. gcc 13 -O2 -fPIC: 2 PLT calls (honors interposition by default).
+E11 finite loops: spin(i,n) while(i!=n) i+=2; -std=c99 keeps loop; c11/gnu17 -> function is just retq.
+E12 layout: {char,double,char,double,short}=40 bytes vs sorted 24 bytes.

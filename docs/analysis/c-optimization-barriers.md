@@ -18,23 +18,26 @@ Where a statement is a reading of the evidence rather than something measured or
 
 ## 0. Summary
 
-**Ranked by measured impact.**
+**Roughly ranked by measured impact.**
 
 | # | Barrier (C rule) | Where the compiler gives up | Evidence | Measured cost | What a stricter language could guarantee |
 |---|---|---|---|---|---|
-| 1 | **Calls have unknown memory effects, and pointers escape freely** | `BasicAliasAnalysis.cpp:980-996`, `:1076-1077`; `Attributes.cpp:1458-1461`; `CaptureTracking.cpp:304`, `:323-327` | In SQLite, 71% of the 237,932 loads GVN failed to eliminate were blocked by a call. 93% of those callees are defined in the same file, yet LLVM inferred *nothing* about their memory effects. In Lua (split into separate files), 59% of blocking calls go to another file or libc. | LTO: see §5 | Checked effect summaries on every function. Pointers and locals don't escape unless marked. Module-private by default. |
-| 2 | **Aliasing rules: `char` aliases everything, unions have no type info, `restrict` is parameter-only, `const` promises nothing** | `CodeGenTBAA.cpp:166-174`; `CGExpr.cpp:5856-5858`; `CGCall.cpp:3602-3604` | A byte fill through a struct field is **34× slower** than the same loop with hoisted locals (0.474 vs 0.014 ns/byte). Turning off type-based alias analysis in SQLite gives 60% more store-clobbered loads, 9% fewer vectorized loops and 10% fewer scalar promotions. | §5 (`-fno-strict-aliasing`) | A distinct `byte` type holds the aliasing power. Exclusive references or `restrict` by default. Tagged unions. |
-| 3 | **Strict IEEE floating point, and `errno` in libm** | `Builtins.cpp:285-289`; `Linux.cpp:962-966`; `IVDescriptors.cpp:1019-1022` | Float sum: **8.1× faster** when reassociation is allowed. `sqrt` loop: **2.0× faster** without `errno` (SSE2). | §5 (`-fno-math-errno`, `-ffast-math`) | Pure math functions. Reductions that are explicitly reassociable. |
-| 4 | **Unsigned arithmetic wraps; `int` indexes get sign-extended** | `CGExprScalar.cpp:4763-4766`; `SimplifyIndVar.cpp:1502-1505` | `unsigned` index plus offset: the vectorizer has to add a runtime wrap check, and the scalar loop re-computes the index with trunc, add and zext each iteration. `-fwrapv` does the same to `int`. | §5 (`-fwrapv`) | Overflow traps or is UB for every fixed-width integer, with explicit wrapping operators. Pointer-width index type. |
-| 5 | **External linkage by default; separate compilation** | `GlobalOpt.cpp:1671-1673`, `:1983-1988`; `ArgumentPromotion.cpp:816-818`; `DeadArgumentElimination.cpp:463-466` | Lua: 3,086 "definition unavailable" inlining misses. The same kind of miss occurs 262 times in the one-file SQLite amalgamation. | §5 (LTO, amalgamation vs. split) | Module system. Exports are explicit and hidden or protected. Interface files carry effect summaries. |
+| 1 | **Calls have unknown memory effects, and pointers escape freely** | `BasicAliasAnalysis.cpp:980-996`, `:1076-1077`; `Attributes.cpp:1458-1461`; `CaptureTracking.cpp:304`, `:323-327` | In SQLite, 71% of the 237,932 loads GVN failed to eliminate were blocked by a call. 93% of those callees are defined in the same file, yet LLVM inferred *nothing* about their memory effects. In Lua (split into separate files), 59% of blocking calls go to another file or libc. | No flag can switch this rule off. The part we can measure is file visibility (row 5). | Checked effect summaries on every function. Pointers and locals don't escape unless marked. Module-private by default. |
+| 2 | **Aliasing rules: `char` aliases everything, unions have no type info, `restrict` is parameter-only, `const` promises nothing** | `CodeGenTBAA.cpp:166-174`; `CGExpr.cpp:5856-5858`; `CGCall.cpp:3602-3604` | A byte fill through a struct field is **34× slower** than the same loop with hoisted locals (0.474 vs 0.014 ns/byte). Turning off type-based alias analysis in SQLite gives 60% more store-clobbered loads, 9% fewer vectorized loops and 10% fewer scalar promotions. | Whole program: within noise (SQLite −0.2%, Lua +1.5%, zstd +1.3%), even though the flag changes the code of 7–17% of functions | A distinct `byte` type holds the aliasing power. Exclusive references or `restrict` by default. Tagged unions. |
+| 3 | **Strict IEEE floating point, and `errno` in libm** | `Builtins.cpp:285-289`; `Linux.cpp:962-966`; `IVDescriptors.cpp:1019-1022` | Float sum: **8.1× faster** when reassociation is allowed. `sqrt` loop: **2.0× faster** without `errno` (SSE2). | Whole program: no effect on these integer-heavy programs. `-fno-math-errno` produces byte-identical code for SQLite and zstd. | Pure math functions. Reductions that are explicitly reassociable. |
+| 4 | **Unsigned arithmetic wraps; `int` indexes get sign-extended** | `CGExprScalar.cpp:4763-4766`; `SimplifyIndVar.cpp:1502-1505` | `unsigned` index plus offset: the vectorizer has to add a runtime wrap check, and the scalar loop re-computes the index with trunc, add and zext each iteration. `-fwrapv` does the same to `int`. | Whole program: within noise (+1.4%, +2.0%, −0.5%) | Overflow traps or is UB for every fixed-width integer, with explicit wrapping operators. Pointer-width index type. |
+| 5 | **External linkage by default; separate compilation** | `GlobalOpt.cpp:1671-1673`, `:1983-1988`; `ArgumentPromotion.cpp:816-818`; `DeadArgumentElimination.cpp:463-466` | Lua: 3,086 "definition unavailable" inlining misses. The same kind of miss occurs 262 times in the one-file SQLite amalgamation. | **SQLite split into 100 files: −3.3%, slower in 6 of 6 rounds; LTO recovers it (+2.2%). Lua as one file: +4.7%, faster in 6 of 6 rounds.** | Module system. Exports are explicit and hidden or protected. Interface files carry effect summaries. |
 | 6 | **`setjmp`, varargs, function pointers** | `InlineCost.cpp:3189-3191`, `:3352-3356`; `CGCall.cpp:2914-2921` | Never inlined (`cost=never`). SQLite has 1,541 varargs inlining refusals. 16.5% (SQLite) and 12.9% (Lua) of blocking calls are indirect. | — | No `setjmp`. Typed variadics. Closed-world function values. |
 | 7 | **ABI and layout: structs over 16 bytes go through memory; fields stay in declaration order** | `X86.cpp:2111-2114`, `:2190-2195`; `RecordLayoutBuilder.cpp:1439-1447` | `struct {double x,y,z}` travels on the stack (6 memory operands in `dot3`), while `{double x,y}` travels in registers. A badly ordered struct is 40 bytes; sorted, it is 24. | — | Layout unspecified by default, `repr(C)` for FFI, a private calling convention between Cx functions. |
 | 8 | **Frontend complexity: preprocessor, context-sensitive grammar, 13 C dialects shared with C++** | `Parser.cpp:1988-2040`; `SemaInit.cpp:324-354` | Sema is 331,629 lines. 5 libc headers expand 6 lines to 1,648. The front end takes 54% of a `-O0` Lua build. | Compile time, not run time | Modules instead of `#include`. Context-free syntax. One dialect. |
 
 **Three conclusions shape the Cx roadmap.**
 
-- **The biggest lever is memory-effect and escape information, not micro-rules.** In all three real code bases, "clobbered by a call" dominates the optimizer's failures. It dominates even when every callee is visible, as in SQLite's single-file amalgamation. LLVM's summary of what a function touches only distinguishes argument memory, inaccessible memory, errno and "everything else". A C function that writes through a pointer it loaded from a struct falls into "everything else".
-- **Several famous C rules are small in practice for integer-heavy code**, but large for the kernels they hit. Examples are errno, FP strictness and signed-overflow UB. §5 has the exact numbers. The language should still fix them, because the fixes are cheap and remove performance cliffs.
+- **The biggest lever is memory-effect and escape information, not micro-rules.**
+  - In SQLite and Lua, about 70% of the loads the optimizer failed to eliminate were blocked by a call. That holds even when every callee is visible, as in SQLite's single-file amalgamation.
+  - zstd keeps hot state in locals and is the exception (33%).
+  - The only whole-program speed effect that beat the noise floor in every round was cross-file visibility (§5). LLVM's summary of what a function touches only distinguishes argument memory, inaccessible memory, errno and "everything else". A C function that writes through a pointer it loaded from a struct falls into "everything else".
+- **Relaxing the famous UB-based rules changed no whole-program result beyond the noise floor.** This covers strict aliasing, signed overflow, null-check deletion, forward progress, errno and FP strictness. Each measured within ±2–3% on SQLite, Lua and zstd, even though some of them rewrite 15–36% of functions. They matter as *cliffs* in specific kernels (2×–34× above), not as general speed-ups for integer-heavy systems code. The language should still fix them, because the fixes are cheap and remove the cliffs.
 - **Most frontend complexity costs engineering, not runtime.** In an optimized build of the SQLite amalgamation, the front end is 2.7% of compile time. The optimizer is 51% and code generation is 45%.
 
 ---
@@ -48,9 +51,9 @@ Where a statement is a reading of the evidence rather than something measured or
 | Machine | Intel Xeon @ 2.80 GHz (KVM guest), 4 cores, AVX-512 available, glibc 2.39 |
 | SQLite | 3.54.0 (`2503dc6`). Built as the amalgamation `sqlite3.c` (9.5 MB, 270,822 lines) and as 100 separate files. Benchmark: `speedtest1 --memdb --size 60 --singlethread --nomemstat`. |
 | Lua | 5.5 development tree (`0b29f40`). Built as 32 separate files and as `onelua.c`. Benchmark: 6 scripts (`fib`, `nbody`, `spectral`, `strings`, `tables`, `closures`). |
-| zstd | 1.6.0-dev (`01b7154`), `-O3`, with `ZSTD_DISABLE_ASM` so the hot loops are C. Benchmark: `zstd -b{1,3} -i2 -T1` on a 75 MB mix of source text and machine code. |
+| zstd | 1.6.0-dev (`01b7154`), `-O3`, with `ZSTD_DISABLE_ASM` so the hot loops are C. Benchmark: `zstd -b{1,3} -i1 -T1` on a 75 MB mix of source text and machine code. |
 | Optimization level | Each project's own default: SQLite and Lua `-O2`, zstd `-O3` |
-| Benchmark protocol | 5 rounds. Variant order shuffled every round. Each run pinned to one core (`taskset -c 3`). Every variant is compared with its project's baseline **in the same round**. We report the median and the range of those paired ratios. |
+| Benchmark protocol | 6 rounds. Variant order shuffled every round. Each run pinned to one core (`taskset -c 3`), with nothing else running. Every variant is compared with its project's baseline **in the same round**. We report the median, the range, and how many rounds were faster. Byte-identical copies of each baseline serve as noise controls. |
 
 Everything needed to reproduce this is in [`c-optimization-barriers/`](c-optimization-barriers/) (see §7).
 
@@ -495,14 +498,84 @@ sizeof {double; double; short; char; char}  = 24 bytes (same fields, sorted)
 
 ## 5. Ablation: switching C rules off in real programs
 
-> **Pending.** The benchmark run for this section is in progress. A first run was thrown away: variants whose code was byte-identical to the baseline "measured" 8–11% apart, because other compiles were running on the machine at the same time. The rerun includes control binaries that are exact copies of each baseline, so the noise floor is measured directly. This section will be filled in from that run.
->
-> Already established from the builds:
-> - `-fno-math-errno` produces byte-identical code for SQLite and zstd, which make no libm calls in hot code.
-> - `-fno-finite-loops` produces byte-identical code for Lua.
-> - Text size, relative to each project's baseline:
->   - LTO shrinks SQLite by 3.1% and zstd by 5.3%, but grows Lua by 33% (more inlining).
->   - Building SQLite as 100 separate files instead of the amalgamation gives a 26.5% smaller binary (less inlining).
+### 5.1 Protocol
+
+**Setup:**
+
+- Each project was rebuilt once per variant; each variant adds one flag that relaxes one C rule.
+- 6 rounds, variant order shuffled each round, every run pinned to one core.
+
+**The per-round composite:**
+
+| Project | Composite |
+|---|---|
+| SQLite | `speedtest1` total time |
+| Lua | geometric mean of the 6 scripts |
+| zstd | geometric mean of compression and decompression MB/s at levels 1 and 3 |
+
+**How to read the numbers:**
+
+- Each value is the **median change in speed across the 6 rounds** (positive = faster), then the **[min, max]** round, then **how many of the 6 rounds were faster** than the same round's baseline.
+- **Controls** are byte-identical copies of each baseline binary. They measure the noise floor of this VM. The controls drift by −0.9% / +1.8% / +1.0% in the median, and single rounds range from −4% to +9%.
+- **Rule of thumb:** a median within about ±2.5%, or a mixed faster count, means *no detectable effect*.
+
+### 5.2 Relaxing individual C rules
+
+| Variant (C rule relaxed) | SQLite | Lua | zstd |
+|---|---|---|---|
+| **Control** (identical binary) | −0.9% [−4.0, +4.1] 2/6 | +1.8% [−1.5, +4.4] 5/6 | +1.0% [−2.3, +8.6] 4/6 |
+| `-fno-strict-aliasing` (no TBAA) | −0.2% [−9.5, +2.3] 2/6 | +1.5% [−2.3, +8.1] 5/6 | +1.3% [−0.9, +7.7] 4/6 |
+| `-fwrapv` (signed overflow defined) | +1.4% [−9.5, +5.3] 4/6 | +2.0% [−4.1, +3.9] 5/6 | −0.5% [−2.1, +3.0] 3/6 |
+| `-fno-delete-null-pointer-checks` | −0.9% [−7.3, +5.6] 3/6 | −1.7% [−9.0, +5.5] 3/6 | +0.4% [−6.4, +7.3] 3/6 |
+| All three above (the Linux-kernel dialect) | +0.9% [−5.6, +2.3] 4/6 | +0.5% [−1.1, +5.2] 4/6 | **+2.5% [+1.5, +4.1] 6/6** |
+| `-fno-math-errno` | *byte-identical code* | +2.2% [−0.7, +5.6] 5/6 (1 function changed) | *byte-identical code* |
+| `-ffast-math` | −1.9% [−7.3, +8.8] 2/6 | −0.8% [−3.5, +1.7] 2/6 | +2.0% [−3.4, +4.9] 4/6 |
+| `-fno-finite-loops` (drop C11 progress) | −1.4% [−5.3, +1.9] 3/6 | *byte-identical code* | +0.6% [−6.1, +5.1] 3/6 |
+| `-fno-builtin` (forget libc semantics) | −3.5% [−6.9, +2.7] 2/6 | −1.6% [−6.7, +0.9] 1/6 | +3.2% [−0.7, +7.0] 5/6 |
+| *Calibration:* `-march=native` (AVX-512) | +0.2% [−3.9, +4.2] 3/6 | +1.4% [−3.0, +7.7] 4/6 | **−9.4% [−11.6, −0.3] 0/6** |
+
+The calibration row is not a C rule. It shows that the harness *does* detect changes of this size. For zstd, AVX-512 code generation makes decompression 21% slower at level 1.
+
+### 5.3 How much of the program each rule touches (static, exact)
+
+| Variant | SQLite: `.text` / functions whose size changed | Lua | zstd |
+|---|---|---|---|
+| `-fno-strict-aliasing` | −0.3% / 16.8% | −0.8% / 7.4% | −0.1% / 16.1% |
+| `-fwrapv` | −0.4% / 17.6% | −0.2% / 8.2% | +0.1% / 3.6% |
+| `-fno-delete-null-pointer-checks` | +0.3% / 15.2% | +0.2% / 1.6% | +0.0% / 3.0% |
+| All three | −0.4% / 36.2% | −1.0% / 15.1% | +0.1% / 20.8% |
+| `-fno-math-errno` | 0 / 0% | −0.0% / 0.1% | 0 / 0% |
+| `-ffast-math` | −0.1% / 2.0% | −0.2% / 3.5% | +0.0% / 1.2% |
+| `-fno-builtin` | −0.8% / 20.4% | +0.1% / 5.2% | −0.5% / 17.3% |
+
+### 5.4 Translation-unit visibility: the one effect that shows up every round
+
+| Build | SQLite | Lua |
+|---|---|---|
+| One translation unit (SQLite amalgamation; Lua `onelua.c`) | *baseline* | **+4.7% [+2.1, +9.0] 6/6** vs. separate files |
+| Separate files (SQLite: 100 files; Lua: 32 files) | **−3.3% [−12.1, −0.2] 0/6** | *baseline* |
+| Separate files + full LTO | +2.2% [−0.1, +8.3] 5/6 | +2.6% [−4.0, +8.7] 4/6 |
+| One translation unit + full LTO | −1.4% [−3.5, +2.9] 2/6 | −0.8% [−3.0, +6.2] 3/6 |
+
+**What else changes with visibility:**
+
+- zstd with full LTO: +1.7% [−6.0, +3.1] 4/6.
+- Code size moves a lot with visibility. SQLite's split build has **26.6%** less `.text`: less inlining, 68% of functions changed. Lua built as one unit has 34.7% more.
+
+### 5.5 Reading the results (inference)
+
+1. **Individual rules are small at whole-program scale.** On these three programs, no single UB-based C rule changes speed beyond the ±2.5% noise floor: not strict aliasing, not signed overflow, not null-check deletion, not forward progress. That is true even though each one rewrites up to 18% of functions (36% combined). The rules are real but local. The micro-kernels in §4 show where they bite (up to 34×), and in pointer-chasing integer code those places are not hot enough to move the total.
+2. **Visibility is the one effect that shows up every round.** Compiling as one unit is 3–5% faster, and LTO recovers most of the loss for SQLite. This matches the census, where call opacity dominates, and it is exactly what Cx's module-private defaults and interface effect summaries (§6, priority 1) would give without LTO.
+3. **FP and errno rules don't affect these programs.** `-fno-math-errno` leaves SQLite and zstd byte-identical, and the census found no math-errno vectorization failures in any of the three. The 2× and 8.1× kernel results apply to numeric code. That is a real but different workload, not measured here at program scale.
+4. **Relaxing C rules never caused a consistent slowdown.** zstd was even consistently 2.5% *faster* under the kernel dialect (6/6); the cause is not attributed (possibly code layout or heuristic interaction). zstd's speed does not depend on the UB-derived facts these flags remove.
+5. **Implication:** for C-like systems code, Cx's performance case rests on *making information available*: effects, escape, visibility, aliasing guarantees the programmer states. It does not rest on exploiting more undefined behaviour. The numeric rules (§6, priority 3) remove cliffs and should be adopted, but they should not be expected to speed up programs like these on their own.
+
+**Limits:**
+
+- One VM, 6 rounds; effects under about 2–3% are not detectable.
+- Baseline SSE2 target.
+- Three integer-heavy programs. Numeric, HPC or media code would weight the floating-point rules very differently.
+- The raw per-round data and the scripts are in [`c-optimization-barriers/ablation/`](c-optimization-barriers/ablation/): `results.jsonl`, `analyze.py`, `summarize.py`.
 
 ---
 
@@ -596,7 +669,9 @@ All inputs are in [`c-optimization-barriers/`](c-optimization-barriers/):
 | `census/remarks.py` | Aggregates `-fsave-optimization-record` YAML by pass, remark and message |
 | `census/callkinds.py`, `calleemem.py`, `pertu.py` | Classify the calls that block GVN (direct, indirect, external) and the memory effects of the callees |
 | `ablation/build.sh`, `variants.txt` | Build SQLite, Lua and zstd per variant (`WORK=… LLVM=… ./build.sh sqlite nosa -fno-strict-aliasing`). LTO goes through `llvm-lto`, because the release's `ld.lld` needs ICU 70. |
-| `ablation/bench.py`, `analyze.py`, `luabench/*.lua` | Benchmark harness and summary |
+| `ablation/bench.py`, `analyze.py`, `summarize.py`, `luabench/*.lua` | Benchmark harness, per-metric and per-round summaries |
+| `ablation/results.jsonl` | Raw per-round results behind §5 (6 rounds × 37 binaries) |
+| `kernels/RESULTS.txt` | Raw notes from the micro-kernel runs behind §4 |
 
 **Example commands:**
 
