@@ -1,16 +1,8 @@
 /* Codec kernels: CRC-32, base64, SHA-256, LZ77 match finding, run-length coding. */
 #include "bench.cxh"
+#include "kern_util.cxh"
 
 #include <string.h>
-
-/* Fills p[0..n) with pseudo-random bytes. */
-static void fill_random(uint8_t *p, size_t n, uint64_t seed) {
-    struct rng r = { seed };
-    for (size_t i = 0; i < n; i += 8) {
-        uint64_t x = rng_next(&r);
-        for (size_t k = 0; k < 8 && i + k < n; k++) p[i + k] = (uint8_t)((x >> (8 * k)) & 0xffu);
-    }
-}
 
 /* ---- crc32: table-driven CRC-32 (IEEE 802.3, reflected) ------------------- */
 
@@ -29,7 +21,7 @@ static void *crc_setup(void) {
         s->table[n] = c;
     }
     s->buf = (uint8_t *)bench_alloc(CRC_BYTES);
-    fill_random(s->buf, CRC_BYTES, 0x3c6ef372fe94f82bu);
+    kern_fill_random(s->buf, CRC_BYTES, 0x3c6ef372fe94f82bu);
     return s;
 }
 
@@ -55,9 +47,9 @@ extern const struct bench bench_crc32 = {
     crc_setup, crc_run, crc_teardown,
 };
 
-/* ---- base64: encode then decode random bytes, verify the round trip ------- */
+/* ---- base64: encode then decode random bytes ----------------------------- */
 
-enum { B64_BYTES = 16 << 20, B64_TEXT = (B64_BYTES + 2) / 3 * 4 };
+enum { B64_BYTES = 26 << 20, B64_TEXT = (B64_BYTES + 2) / 3 * 4 };
 
 struct b64 {
     [[cx::owned]] uint8_t *enc;    /* 6-bit value -> character (64 entries) */
@@ -66,26 +58,6 @@ struct b64 {
     [[cx::owned]] uint8_t *text;
     [[cx::owned]] uint8_t *back;
 };
-
-static void *b64_setup(void) {
-    struct b64 *s = (struct b64 *)bench_alloc(sizeof *s);
-    s->enc = (uint8_t *)bench_alloc(64);
-    s->dec = (uint8_t *)bench_alloc(256);
-    for (int i = 0; i < 26; i++) {
-        s->enc[i] = (uint8_t)('A' + i);
-        s->enc[26 + i] = (uint8_t)('a' + i);
-    }
-    for (int i = 0; i < 10; i++) s->enc[52 + i] = (uint8_t)('0' + i);
-    s->enc[62] = (uint8_t)'+';
-    s->enc[63] = (uint8_t)'/';
-    for (int i = 0; i < 256; i++) s->dec[i] = 0xffu;
-    for (int i = 0; i < 64; i++) s->dec[s->enc[i]] = (uint8_t)i;
-    s->src = (uint8_t *)bench_alloc(B64_BYTES);
-    s->text = (uint8_t *)bench_alloc(B64_TEXT);
-    s->back = (uint8_t *)bench_alloc(B64_BYTES + 3);
-    fill_random(s->src, B64_BYTES, 0xa54ff53a5f1d36f1u);
-    return s;
-}
 
 static size_t b64_encode(const uint8_t *alpha, const uint8_t *in, size_t n, uint8_t *out) {
     size_t i = 0, o = 0;
@@ -143,15 +115,45 @@ static struct b64_result b64_decode(const uint8_t *dec, const uint8_t *in, size_
     return res;
 }
 
+/* The round trip is verified once, untimed. */
+static void b64_verify(struct b64 *s) {
+    size_t tlen = b64_encode(s->enc, s->src, B64_BYTES, s->text);
+    struct b64_result r = b64_decode(s->dec, s->text, tlen, s->back);
+    if (tlen != B64_TEXT || r.len != B64_BYTES || r.bad != 0 || memcmp(s->back, s->src, B64_BYTES) != 0)
+        kern_fail("base64: round trip mismatch");
+}
+
+static void *b64_setup(void) {
+    struct b64 *s = (struct b64 *)bench_alloc(sizeof *s);
+    s->enc = (uint8_t *)bench_alloc(64);
+    s->dec = (uint8_t *)bench_alloc(256);
+    for (int i = 0; i < 26; i++) {
+        s->enc[i] = (uint8_t)('A' + i);
+        s->enc[26 + i] = (uint8_t)('a' + i);
+    }
+    for (int i = 0; i < 10; i++) s->enc[52 + i] = (uint8_t)('0' + i);
+    s->enc[62] = (uint8_t)'+';
+    s->enc[63] = (uint8_t)'/';
+    for (int i = 0; i < 256; i++) s->dec[i] = 0xffu;
+    for (int i = 0; i < 64; i++) s->dec[s->enc[i]] = (uint8_t)i;
+    s->src = (uint8_t *)bench_alloc(B64_BYTES);
+    s->text = (uint8_t *)bench_alloc(B64_TEXT);
+    s->back = (uint8_t *)bench_alloc(B64_BYTES + 3);
+    kern_fill_random(s->src, B64_BYTES, 0xa54ff53a5f1d36f1u);
+    b64_verify(s);
+    return s;
+}
+
+/* Checksum: output lengths, the invalid-character flag and every 64th byte
+ * of the text and of the decoded bytes. */
 static uint64_t b64_run(void *state) {
     const struct b64 *s = (const struct b64 *)state;
     size_t tlen = b64_encode(s->enc, s->src, B64_BYTES, s->text);
     struct b64_result r = b64_decode(s->dec, s->text, tlen, s->back);
-    uint64_t mismatches = 0, tsum = 0;
-    for (size_t i = 0; i < B64_BYTES; i++)
-        if (s->back[i] != s->src[i]) mismatches++;
-    for (size_t i = 0; i < tlen; i++) tsum += (uint64_t)s->text[i];
-    return mix(mix(mix(mix(mix(0, tlen), r.len), r.bad), mismatches), tsum);
+    uint64_t h = mix(mix(mix(0, tlen), r.len), r.bad);
+    for (size_t i = 0; i < tlen; i += 64) h = mix(h, s->text[i]);
+    for (size_t i = 0; i < r.len; i += 64) h = mix(h, s->back[i]);
+    return h;
 }
 
 static void b64_teardown([[cx::escapes]] void *state) {
@@ -165,7 +167,7 @@ static void b64_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_base64 = {
-    "base64", "kern", "base64 encode + decode of 16 MB random bytes, round-trip check",
+    "base64", "kern", "base64 encode + decode of 26 MB random bytes (round trip verified in setup)",
     b64_setup, b64_run, b64_teardown,
 };
 
@@ -189,7 +191,7 @@ struct sha { [[cx::owned]] uint8_t *buf; };
 static void *sha_setup(void) {
     struct sha *s = (struct sha *)bench_alloc(sizeof *s);
     s->buf = (uint8_t *)bench_alloc(SHA_BYTES);
-    fill_random(s->buf, SHA_BYTES, 0x510e527fade682d1u);
+    kern_fill_random(s->buf, SHA_BYTES, 0x510e527fade682d1u);
     return s;
 }
 
@@ -249,7 +251,7 @@ static void sha256(const uint8_t *msg, size_t n, uint32_t *digest) {
     size_t rem = n - full * 64;
     memcpy(tail, msg + full * 64, rem);
     tail[rem] = 0x80u;
-    size_t tlen = rem < 56 ? 64 : 128;
+    size_t tlen = rem < 56 ? 64u : 128u;
     uint64_t bits = (uint64_t)n * 8;
     for (size_t k = 0; k < 8; k++) tail[tlen - 1 - k] = (uint8_t)((bits >> (8 * k)) & 0xffu);
     for (size_t j = 0; j < tlen; j += 64) sha256_block(hs, tail + j);
@@ -409,33 +411,13 @@ extern const struct bench bench_lz_match = {
 
 /* ---- rle_codec: PackBits-style run-length encode + decode ----------------- */
 
-enum { RLE_BYTES = 24 << 20, RLE_MAXRUN = 130, RLE_MAXLIT = 128, RLE_CAP = RLE_BYTES + RLE_BYTES / 64 + 16 };
+enum { RLE_BYTES = 40 << 20, RLE_MAXRUN = 130, RLE_MAXLIT = 128, RLE_CAP = RLE_BYTES + RLE_BYTES / 64 + 16 };
 
 struct rle {
     [[cx::owned]] uint8_t *src;
     [[cx::owned]] uint8_t *enc;
     [[cx::owned]] uint8_t *dec;
 };
-
-static void *rle_setup(void) {
-    struct rle *s = (struct rle *)bench_alloc(sizeof *s);
-    s->src = (uint8_t *)bench_alloc(RLE_BYTES);
-    s->enc = (uint8_t *)bench_alloc(RLE_CAP);
-    s->dec = (uint8_t *)bench_alloc(RLE_BYTES);
-    struct rng r = { 0x6a09e667f3bcc909u };
-    size_t pos = 0;
-    while (pos < RLE_BYTES) {
-        if (rng_below(&r, 4) == 0) {                  /* noisy stretch */
-            size_t len = 1 + rng_below(&r, 24);
-            for (size_t k = 0; k < len && pos < RLE_BYTES; k++) s->src[pos++] = (uint8_t)rng_below(&r, 256);
-        } else {                                      /* run, mostly long */
-            size_t len = 1 + rng_below(&r, rng_below(&r, 600) + 1);
-            uint8_t v = (uint8_t)rng_below(&r, 256);
-            for (size_t k = 0; k < len && pos < RLE_BYTES; k++) s->src[pos++] = v;
-        }
-    }
-    return s;
-}
 
 /* Control byte c < 128: c+1 literal bytes follow. c >= 128: the next byte
  * repeats c-125 times (3..130). */
@@ -488,15 +470,44 @@ static size_t rle_decode(const uint8_t *in, size_t n, uint8_t *out, size_t cap) 
     return o;
 }
 
+/* The round trip is verified once, untimed. */
+static void rle_verify(struct rle *s) {
+    size_t elen = rle_encode(s->src, RLE_BYTES, s->enc);
+    size_t dlen = rle_decode(s->enc, elen, s->dec, RLE_BYTES);
+    if (elen > RLE_CAP || dlen != RLE_BYTES || memcmp(s->dec, s->src, RLE_BYTES) != 0)
+        kern_fail("rle_codec: round trip mismatch");
+}
+
+static void *rle_setup(void) {
+    struct rle *s = (struct rle *)bench_alloc(sizeof *s);
+    s->src = (uint8_t *)bench_alloc(RLE_BYTES);
+    s->enc = (uint8_t *)bench_alloc(RLE_CAP);
+    s->dec = (uint8_t *)bench_alloc(RLE_BYTES);
+    struct rng r = { 0x6a09e667f3bcc909u };
+    size_t pos = 0;
+    while (pos < RLE_BYTES) {
+        if (rng_below(&r, 4) == 0) {                  /* noisy stretch */
+            size_t len = 1 + rng_below(&r, 24);
+            for (size_t k = 0; k < len && pos < RLE_BYTES; k++) s->src[pos++] = (uint8_t)rng_below(&r, 256);
+        } else {                                      /* run, mostly long */
+            size_t len = 1 + rng_below(&r, rng_below(&r, 600) + 1);
+            uint8_t v = (uint8_t)rng_below(&r, 256);
+            for (size_t k = 0; k < len && pos < RLE_BYTES; k++) s->src[pos++] = v;
+        }
+    }
+    rle_verify(s);
+    return s;
+}
+
+/* Checksum: output lengths and every 64th byte of the encoded and decoded data. */
 static uint64_t rle_run(void *state) {
     const struct rle *s = (const struct rle *)state;
     size_t elen = rle_encode(s->src, RLE_BYTES, s->enc);
     size_t dlen = rle_decode(s->enc, elen, s->dec, RLE_BYTES);
-    uint64_t mismatches = 0, esum = 0;
-    for (size_t i = 0; i < dlen; i++)
-        if (s->dec[i] != s->src[i]) mismatches++;
-    for (size_t i = 0; i < elen; i++) esum += (uint64_t)s->enc[i];
-    return mix(mix(mix(mix(0, elen), dlen), mismatches), esum);
+    uint64_t h = mix(mix(0, elen), dlen);
+    for (size_t i = 0; i < elen; i += 64) h = mix(h, s->enc[i]);
+    for (size_t i = 0; i < dlen; i += 64) h = mix(h, s->dec[i]);
+    return h;
 }
 
 static void rle_teardown([[cx::escapes]] void *state) {
@@ -508,6 +519,6 @@ static void rle_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_rle_codec = {
-    "rle_codec", "kern", "PackBits-style run-length encode + decode of 24 MB with long runs",
+    "rle_codec", "kern", "PackBits-style run-length encode + decode of 40 MB with long runs",
     rle_setup, rle_run, rle_teardown,
 };

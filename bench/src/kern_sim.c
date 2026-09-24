@@ -134,20 +134,35 @@ enum { MB_W = 560, MB_H = 420, MB_MAXIT = 256 };
 
 static const double mb_x0 = -2.2, mb_x1 = 0.8, mb_y0 = -1.2, mb_y1 = 1.2;
 
-struct mandel { [[cx::owned]] uint16_t *img; };
+/* The grid size, iteration limit and window are copied into the state in
+ * setup, so the kernel cannot be specialized to compile-time constants. */
+struct mandel {
+    [[cx::owned]] uint16_t *img;
+    size_t w, h;
+    unsigned maxit;
+    double x0, x1, y0, y1;
+};
 
 static void *mandel_setup(void) {
     struct mandel *s = (struct mandel *)bench_alloc(sizeof *s);
-    s->img = (uint16_t *)bench_alloc((size_t)MB_W * MB_H * sizeof(uint16_t));
+    s->w = MB_W;
+    s->h = MB_H;
+    s->maxit = MB_MAXIT;
+    s->x0 = mb_x0;
+    s->x1 = mb_x1;
+    s->y0 = mb_y0;
+    s->y1 = mb_y1;
+    s->img = (uint16_t *)bench_alloc(s->w * s->h * sizeof(uint16_t));
     return s;
 }
 
-static void mandel_render(uint16_t *img, size_t w, size_t h, unsigned maxit) {
-    double dx = (mb_x1 - mb_x0) / (double)w, dy = (mb_y1 - mb_y0) / (double)h;
+static void mandel_render(uint16_t *img, size_t w, size_t h, unsigned maxit,
+                          double x0, double x1, double y0, double y1) {
+    double dx = (x1 - x0) / (double)w, dy = (y1 - y0) / (double)h;
     for (size_t py = 0; py < h; py++) {
-        double ci = mb_y0 + (double)py * dy;
+        double ci = y0 + (double)py * dy;
         for (size_t px = 0; px < w; px++) {
-            double cr = mb_x0 + (double)px * dx;
+            double cr = x0 + (double)px * dx;
             double zr = 0.0, zi = 0.0, zr2 = 0.0, zi2 = 0.0;
             unsigned it = 0;
             while (it < maxit && zr2 + zi2 <= 4.0) {
@@ -164,11 +179,12 @@ static void mandel_render(uint16_t *img, size_t w, size_t h, unsigned maxit) {
 
 static uint64_t mandel_run(void *state) {
     const struct mandel *s = (const struct mandel *)state;
-    mandel_render(s->img, MB_W, MB_H, MB_MAXIT);
+    size_t w = s->w, hgt = s->h;
+    mandel_render(s->img, w, hgt, s->maxit, s->x0, s->x1, s->y0, s->y1);
     uint64_t h = 0;
-    for (size_t py = 0; py < MB_H; py++) {
+    for (size_t py = 0; py < hgt; py++) {
         uint64_t row = 0;
-        for (size_t px = 0; px < MB_W; px++) row += (uint64_t)s->img[py * MB_W + px] * (px + 1);
+        for (size_t px = 0; px < w; px++) row += (uint64_t)s->img[py * w + px] * (px + 1);
         h = mix(h, row);
     }
     return h;
@@ -189,12 +205,19 @@ extern const struct bench bench_mandelbrot = {
 
 enum { SV_LIMIT = 40000000, SV_BITS = SV_LIMIT / 2, SV_WORDS = (SV_BITS + 63) / 64 };
 
-/* Bit k of the array stands for the odd number 2k+1 (SV_LIMIT is even). */
-struct sieve { [[cx::owned]] uint64_t *bits; };
+/* Bit k of the array stands for the odd number 2k+1 (SV_LIMIT is even). The
+ * sizes are copied into the state in setup, so the kernel cannot be
+ * specialized to compile-time constants. */
+struct sieve {
+    [[cx::owned]] uint64_t *bits;
+    size_t nbits, nwords;
+};
 
 static void *sieve_setup(void) {
     struct sieve *s = (struct sieve *)bench_alloc(sizeof *s);
-    s->bits = (uint64_t *)bench_alloc(SV_WORDS * sizeof(uint64_t));
+    s->nbits = SV_BITS;
+    s->nwords = SV_WORDS;
+    s->bits = (uint64_t *)bench_alloc(s->nwords * sizeof(uint64_t));
     return s;
 }
 
@@ -213,9 +236,9 @@ static void sieve_mark(uint64_t *bits, size_t nbits) {
 
 static uint64_t sieve_run(void *state) {
     const struct sieve *s = (const struct sieve *)state;
-    sieve_mark(s->bits, SV_BITS);
+    sieve_mark(s->bits, s->nbits);
     uint64_t count = 1, sum = 2;       /* the prime 2; sum of primes < 4e7 is < 2^48 */
-    for (size_t i = 0; i < SV_WORDS; i++) {
+    for (size_t i = 0; i < s->nwords; i++) {
         uint64_t w = s->bits[i];
         count += stdc_count_ones(w);
         while (w) {

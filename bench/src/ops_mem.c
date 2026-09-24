@@ -37,10 +37,10 @@ enum {
 };
 
 struct mcopy {
-    unsigned char *src; unsigned char *dst;
-    uint32_t *s_src; uint32_t *s_dst; uint32_t *s_len;
-    uint32_t *m_src; uint32_t *m_dst;
-    uint32_t *b_src;
+    [[cx::owned]] unsigned char *src; [[cx::owned]] unsigned char *dst;
+    [[cx::owned]] uint32_t *s_src; [[cx::owned]] uint32_t *s_dst; [[cx::owned]] uint32_t *s_len;
+    [[cx::owned]] uint32_t *m_src; [[cx::owned]] uint32_t *m_dst;
+    [[cx::owned]] uint32_t *b_src;
 };
 
 static void *mcopy_setup(void) {
@@ -114,9 +114,9 @@ extern const struct bench bench_mem_copy = {
 enum { MSC_BUF = 1 << 20, MSC_OPS = 1 << 15 };
 
 struct msc {
-    unsigned char *x; unsigned char *y;
-    uint32_t *off; uint32_t *len; uint32_t *pos;
-    uint8_t *val; uint8_t *flip;
+    [[cx::owned]] unsigned char *x; [[cx::owned]] unsigned char *y;
+    [[cx::owned]] uint32_t *off; [[cx::owned]] uint32_t *len; [[cx::owned]] uint32_t *pos;
+    [[cx::owned]] uint8_t *val; [[cx::owned]] uint8_t *flip;
 };
 
 static void *msc_setup(void) {
@@ -180,7 +180,7 @@ extern const struct bench bench_mem_set_cmp = {
 
 enum { STREAM_N = 1 << 21, STREAM_REPS = 10, STREAM_SAMPLE = 4099 };   /* 16 MB per array */
 
-struct stream { double *a; double *b; double *c; };
+struct stream { [[cx::owned]] double *a; [[cx::owned]] double *b; [[cx::owned]] double *c; };
 
 static void *stream_setup(void) {
     struct stream *s = (struct stream *)bench_alloc(sizeof *s);
@@ -225,13 +225,17 @@ extern const struct bench bench_mem_stream = {
     stream_setup, stream_run, stream_teardown,
 };
 
-/* ---- mem_chase: pointer chasing through a random single-cycle permutation - */
+/* ---- mem_chase: pointer chasing through a random single-cycle permutation -
+ * 2^24 16-byte cells (256 MB, far beyond the 33 MB L3) form one random cycle.
+ * Each run() walks a fixed number of hops from cell 0, so every run visits the
+ * same cells in the same order (idempotent); the hops are dependent loads, so
+ * the time is DRAM (and TLB-miss) latency. */
 
-enum { CHASE_CELLS = 1 << 21, CHASE_STEPS = 3 << 17 };   /* 16-byte cells: 32 MB */
+enum { CHASE_CELLS = 1 << 24, CHASE_HOPS = 320000 };
 
-struct chase_cell { struct chase_cell *next; uint64_t val; };
+struct chase_cell { struct chase_cell *next; uint64_t val; };   /* next: borrowed, into cells */
 
-struct chase { struct chase_cell *cells; };
+struct chase { [[cx::owned]] struct chase_cell *cells; };
 
 static void *chase_setup(void) {
     struct chase *s = (struct chase *)bench_alloc(sizeof *s);
@@ -257,8 +261,8 @@ static void *chase_setup(void) {
 static uint64_t chase_run(void *state) {
     const struct chase *s = (const struct chase *)state;
     const struct chase_cell *p = &s->cells[0];
-    uint64_t sum = 0;
-    for (size_t k = 0; k < CHASE_STEPS; k++) {
+    uint64_t sum = 0;                       /* < CHASE_HOPS * 2^24: no overflow */
+    for (size_t k = 0; k < CHASE_HOPS; k++) {
         sum += p->val;
         p = p->next;
     }
@@ -272,7 +276,7 @@ static void chase_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_mem_chase = {
-    "mem_chase", "ops", "pointer chasing through a random single-cycle permutation (32 MB)",
+    "mem_chase", "ops", "pointer chasing: 320K dependent loads in a random single cycle over 256 MB",
     chase_setup, chase_run, chase_teardown,
 };
 
@@ -280,7 +284,7 @@ extern const struct bench bench_mem_chase = {
 
 enum { STRIDED_DIM = 2048, STRIDED_PASSES = 1 };   /* 2048 x 2048 doubles: 32 MB */
 
-struct strided { double *m; double *col; };
+struct strided { [[cx::owned]] double *m; [[cx::owned]] double *col; };
 
 static void *strided_setup(void) {
     struct strided *s = (struct strided *)bench_alloc(sizeof *s);
@@ -326,8 +330,9 @@ extern const struct bench bench_mem_strided = {
 enum { AC_OPS = 3 << 18, AC_WINDOW = 1024 };
 
 struct churn {
-    uint16_t *size; uint16_t *victim;
-    unsigned char **slot; size_t *slot_len;
+    [[cx::owned]] uint16_t *size; [[cx::owned]] uint16_t *victim;
+    [[cx::owned]] unsigned char **slot;     /* each slot owns its block (or is NULL) */
+    [[cx::owned]] size_t *slot_len;
 };
 
 static void *churn_setup(void) {
@@ -390,4 +395,82 @@ static void churn_teardown([[cx::escapes]] void *state) {
 extern const struct bench bench_alloc_churn = {
     "alloc_churn", "ops", "malloc/free of 16-4096 B blocks, ~1000 live, random victims",
     churn_setup, churn_run, churn_teardown,
+};
+
+/* ---- struct_layout: scans over an array of badly ordered records ---------
+ * In C the members stay in declaration order, so each record is 40 bytes
+ * (1 + 7 pad + 8 + 1 + 7 pad + 8 + 2 + 6 pad); ordered by size it would be
+ * 24 bytes. Cx leaves struct layout unspecified (spec §17, [E12]), so the
+ * array can shrink from 40 MB to 24 MB. The passes stream through the whole
+ * array, so their cost is proportional to its size.
+ *
+ * Values are exact in double: value = k/16 (|k| <= 256), weight = j/16
+ * (0 <= j <= 64) or value * m/4 (1 <= m <= 4). Every product value * weight
+ * is a multiple of 2^-10 with magnitude <= 256, so every sum over 2^20
+ * records is a multiple of 2^-10 below 2^28: exact in any order. */
+
+enum { LAY_N = 1 << 20, LAY_PASSES = 6, LAY_TAGS = 16 };
+
+struct lay_rec {
+    uint8_t tag;        /* 0 .. LAY_TAGS-1 */
+    double value;
+    uint8_t flag;       /* 1 for about 1 record in 8 */
+    double weight;
+    uint16_t id;
+};
+
+struct layout { [[cx::owned]] struct lay_rec *r; };
+
+static void *lay_setup(void) {
+    struct layout *s = (struct layout *)bench_alloc(sizeof *s);
+    s->r = (struct lay_rec *)bench_alloc(LAY_N * sizeof(struct lay_rec));
+    struct rng r = { 0x1a70u };
+    for (size_t i = 0; i < LAY_N; i++) {
+        struct lay_rec *p = &s->r[i];
+        p->tag = (uint8_t)rng_below(&r, LAY_TAGS);
+        p->value = (double)((int32_t)rng_below(&r, 513) - 256) / 16.0;
+        p->flag = (uint8_t)(rng_below(&r, 8) == 0 ? 1 : 0);
+        p->weight = (double)rng_below(&r, 65) / 16.0;
+        p->id = (uint16_t)rng_below(&r, 65536);
+    }
+    return s;
+}
+
+static uint64_t lay_run(void *state) {
+    const struct layout *s = (const struct layout *)state;
+    struct lay_rec *rec = s->r;
+    uint64_t h = 0;
+    for (uint32_t pass = 0; pass < LAY_PASSES; pass++) {
+        /* partial update: re-weight the flagged records. Every pass rewrites
+         * the same records from `value`, so run() is idempotent. */
+        double scale = (double)(1 + (pass & 3)) * 0.25;
+        for (size_t i = 0; i < LAY_N; i++)
+            if (rec[i].flag) rec[i].weight = rec[i].value * scale;
+        /* scan: aggregate over one tag, and a weighted sum over all */
+        uint32_t want = pass % LAY_TAGS;
+        double vsum = 0.0, wsum = 0.0;
+        uint64_t cnt = 0, ids = 0;
+        for (size_t i = 0; i < LAY_N; i++) {
+            if ((uint32_t)rec[i].tag == want) {
+                vsum += rec[i].value;
+                ids += (uint64_t)rec[i].id;
+                cnt += 1;
+            }
+            wsum += rec[i].value * rec[i].weight;
+        }
+        h = mix(mix(mix_double(mix_double(h, vsum), wsum), cnt), ids);
+    }
+    for (size_t i = 0; i < LAY_N; i += 4096) h = mix_double(h, rec[i].weight);
+    return h;
+}
+
+static void lay_teardown([[cx::escapes]] void *state) {
+    struct layout *s = (struct layout *)state;
+    bench_free(s->r);
+    bench_free(s);
+}
+
+extern const struct bench bench_struct_layout = {
+    "struct_layout", "ops", "filter/aggregate and partial update over 1M 40-byte records (24 if reordered)",
+    lay_setup, lay_run, lay_teardown,
 };

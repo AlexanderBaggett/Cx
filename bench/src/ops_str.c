@@ -2,6 +2,8 @@
  * through struct fields, and hand-written integer parsing and formatting. */
 #include "bench.cxh"
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* ---- str_libc: strlen, strcmp, strchr and strstr ------------------------ */
@@ -13,7 +15,10 @@ enum {
 
 /* Strings are letters 'a'..'p'. Each starts with a random-length prefix of a
  * shared base string, so strcmp has to scan before it finds a difference. */
-struct strs { char *pool; uint32_t *off; char *needle; unsigned char *ch; };
+struct strs {
+    [[cx::owned]] char *pool; [[cx::owned]] uint32_t *off;
+    [[cx::owned]] char *needle; [[cx::owned]] unsigned char *ch;
+};
 
 static void *strs_setup(void) {
     struct strs *s = (struct strs *)bench_alloc(sizeof *s);
@@ -194,8 +199,8 @@ extern const struct bench bench_byte_buffer = {
 enum { IPF_COUNT = 1 << 16, IPF_MAXCHARS = 16, IPF_PASSES = 20 };
 
 struct ipf {
-    unsigned char *text; size_t text_len;
-    int64_t *vals; unsigned char *out;
+    [[cx::owned]] unsigned char *text; size_t text_len;
+    [[cx::owned]] int64_t *vals; [[cx::owned]] unsigned char *out;
 };
 
 /* Writes v in decimal (at most 20 bytes); returns the number of bytes. */
@@ -291,4 +296,82 @@ static void ipf_teardown([[cx::escapes]] void *state) {
 extern const struct bench bench_int_parse_format = {
     "int_parse_format", "ops", "parse 64K decimal integers from text and format them back, by hand",
     ipf_setup, ipf_run, ipf_teardown,
+};
+
+/* ---- fmt_snprintf: formatting records with snprintf ----------------------
+ * Each record is an int, a double at fixed precision, a short string and a
+ * hex word, appended to a text buffer as one CSV line by snprintf (a call to
+ * a foreign variadic function). */
+
+enum { FMT_COUNT = 1 << 12, FMT_PASSES = 20, FMT_LINE = 64, FMT_WORDS = 16 };
+
+static const char *const fmt_words[FMT_WORDS] = {
+    "id", "name", "alpha", "beta", "gamma", "delta", "epsilon", "zeta",
+    "eta", "theta", "iota", "kappa", "lambda", "mu", "nu", "omicron",
+};
+
+struct fmt {
+    [[cx::owned]] int32_t *ival; [[cx::owned]] double *dval;
+    [[cx::owned]] uint32_t *uval; [[cx::owned]] uint8_t *word;
+    [[cx::owned]] char *out;   /* FMT_COUNT * FMT_LINE bytes */
+};
+
+static void *fmt_setup(void) {
+    struct fmt *s = (struct fmt *)bench_alloc(sizeof *s);
+    s->ival = (int32_t *)bench_alloc(FMT_COUNT * sizeof(int32_t));
+    s->dval = (double *)bench_alloc(FMT_COUNT * sizeof(double));
+    s->uval = (uint32_t *)bench_alloc(FMT_COUNT * sizeof(uint32_t));
+    s->word = (uint8_t *)bench_alloc(FMT_COUNT);
+    s->out = (char *)bench_alloc(FMT_COUNT * FMT_LINE);
+    struct rng r = { 0xf0f7a7u };
+    for (size_t k = 0; k < FMT_COUNT; k++) {
+        /* ints of 1 to 9 digits, either sign */
+        uint32_t lim = 10;
+        for (uint32_t d = rng_below(&r, 9); d > 0; d--) lim *= 10;
+        int32_t v = (int32_t)rng_below(&r, lim);
+        s->ival[k] = rng_below(&r, 2) ? -v : v;
+        /* doubles in (-10^6, 10^6), many of them small */
+        double mag = rng_unit(&r) * 1.0e6;
+        s->dval[k] = (rng_unit(&r) * 2.0 - 1.0) * mag;
+        s->uval[k] = (uint32_t)(rng_next(&r) >> 32);
+        s->word[k] = (uint8_t)rng_below(&r, FMT_WORDS);
+    }
+    return s;
+}
+
+static uint64_t fmt_run(void *state) {
+    const struct fmt *s = (const struct fmt *)state;
+    const size_t cap = FMT_COUNT * FMT_LINE;
+    uint64_t h = 0;
+    for (int pass = 0; pass < FMT_PASSES; pass++) {
+        size_t pos = 0;
+        uint64_t lens = 0;
+        for (size_t k = 0; k < FMT_COUNT; k++) {
+            /* |ival + pass| < 10^9 + 20; a line is at most 11+1+12+1+7+1+8+1 = 42 bytes */
+            int n = snprintf(s->out + pos, cap - pos, "%d,%.3f,%s,%x\n", s->ival[k] + pass,
+                             s->dval[k] + (double)pass * 0.125, fmt_words[s->word[k]], s->uval[k]);
+            if (n < 0 || (size_t)n >= cap - pos) abort();
+            pos += (size_t)n;
+            lens = mix(lens, (uint64_t)n);
+        }
+        h = mix(mix(h, pos), lens);
+        /* sample every 64th byte, from a pass-dependent start */
+        for (size_t i = (size_t)pass; i < pos; i += 64) h = mix(h, (uint64_t)(unsigned char)s->out[i]);
+    }
+    return h;
+}
+
+static void fmt_teardown([[cx::escapes]] void *state) {
+    struct fmt *s = (struct fmt *)state;
+    bench_free(s->ival);
+    bench_free(s->dval);
+    bench_free(s->uval);
+    bench_free(s->word);
+    bench_free(s->out);
+    bench_free(s);
+}
+
+extern const struct bench bench_fmt_snprintf = {
+    "fmt_snprintf", "ops", "snprintf of int, %.3f double, string and hex fields into a CSV buffer",
+    fmt_setup, fmt_run, fmt_teardown,
 };

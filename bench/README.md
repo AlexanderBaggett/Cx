@@ -16,7 +16,7 @@ Until the repository's compiler diverges from upstream, both toolchains compile 
 | `harness/bench.cxh` | The benchmark API (`struct bench`), deterministic PRNG, overflow-free checksum mixing. Shared headers use the Cx header extension `.cxh`, so the Cx compiler imports them as Cx rather than as foreign C (spec §4.1, §14). C compilers include them unchanged. |
 | `harness/main.c` | Driver: `bench --list`, `bench NAME [--iters K]`, `bench --all` |
 | `harness/list_{ops,ds,alg,kern}.cxh` | Registry, one file per category |
-| `src/ops_*.c` | Core operations: integer, floating point, branches, calls, memory, strings |
+| `src/ops_*.c` | Core operations: integer, floating point, branches, calls, memory, strings, aliasing and ownership (`ops_alias.c`) |
 | `src/ds_*.c` | Data structures |
 | `src/alg_*.c` | Algorithms: sorting, searching, graphs, dynamic programming, backtracking |
 | `src/kern_*.c` | Compute kernels: linear algebra, simulation, codecs, hashing |

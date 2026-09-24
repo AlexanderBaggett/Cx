@@ -20,7 +20,7 @@ static size_t lower_bound_u32(const uint32_t *a, size_t n, uint32_t key) {
     return lo;
 }
 
-struct search_binary { uint32_t *a; uint32_t *q; };
+struct search_binary { [[cx::owned]] uint32_t *a; [[cx::owned]] uint32_t *q; };
 
 static void *search_binary_setup(void) {
     struct search_binary *s = (struct search_binary *)bench_alloc(sizeof *s);
@@ -100,8 +100,8 @@ static struct kmp_result kmp_search(const uint8_t *t, size_t n, const uint8_t *p
 }
 
 struct search_substring {
-    uint8_t *text;
-    uint8_t *pat;                   /* KMP_PATS patterns of KMP_MAXLEN bytes each */
+    [[cx::owned]] uint8_t *text;
+    [[cx::owned]] uint8_t *pat;     /* KMP_PATS patterns of KMP_MAXLEN bytes each */
     size_t plen[KMP_PATS];
 };
 
@@ -125,7 +125,7 @@ static void *search_substring_setup(void) {
             size_t at = rng_below(&r, (uint32_t)(KMP_TEXT - m));
             for (size_t i = 0; i < m; i++) p[i] = s->text[at + i];
         } else {
-            for (size_t i = 0; i < m; i++) p[i] = alpha[rng_below(&r, (k % 4 == 1) ? 2 : 4)];
+            for (size_t i = 0; i < m; i++) p[i] = alpha[rng_below(&r, (k % 4 == 1) ? 2u : 4u)];
         }
         s->plen[k] = m;
     }

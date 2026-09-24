@@ -1,8 +1,10 @@
-/* Array-backed structures: binary heap, ring buffer, bitset, union-find. */
+/* Array-backed structures: binary heap, ring buffer, deque, bitset,
+ * union-find. */
 #include "bench.cxh"
 
 #include <stdbit.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* ---- heap_pq: binary min-heap driving a discrete-event simulation --------- */
 
@@ -178,6 +180,168 @@ static void ring_teardown([[cx::escapes]] void *state) {
 extern const struct bench bench_ring_queue = {
     "ring_queue", "ds", "bounded ring-buffer FIFO of uint64: bursts of enqueue and dequeue",
     ring_setup, ring_run, ring_teardown,
+};
+
+/* ---- deque: growable ring-buffer double-ended queue ---------------------- */
+
+enum {
+    DQ_BURSTS = 1 << 18,        /* bursts per round, of 1..32 operations of one kind */
+    DQ_ROUNDS = 6,              /* each round builds a deque from empty and frees it */
+    DQ_PHASE = 1 << 11,         /* bursts per phase of the traffic pattern */
+    DQ_MIN_CAP = 16,
+};
+
+/* Burst record: bits 0-2 the kind, bits 3-7 the length - 1, bits 8-15 a
+ * random fraction that places a DQ_AT window. */
+enum { DQ_PUSH_BACK, DQ_PUSH_FRONT, DQ_POP_BACK, DQ_POP_FRONT, DQ_AT, DQ_ROTATE, DQ_KINDS };
+
+/* Element i (0 = front) lives at buf[(head + i) & mask]; the capacity
+ * mask + 1 is a power of two. */
+struct deque { [[cx::owned]] uint64_t *buf; size_t head; size_t len; size_t mask; };
+
+static void dq_init(struct deque *d) {
+    d->buf = (uint64_t *)bench_alloc(DQ_MIN_CAP * sizeof(uint64_t));
+    d->head = 0;
+    d->len = 0;
+    d->mask = DQ_MIN_CAP - 1;
+}
+
+/* Double the capacity of a full deque. Its elements are buf[head..cap) then
+ * buf[0..head); moving the second part to buf[cap..cap+head) keeps them
+ * contiguous modulo the new capacity. */
+static void dq_grow(struct deque *d) {
+    size_t cap = d->mask + 1;
+    uint64_t *p = (uint64_t *)realloc(d->buf, 2 * cap * sizeof(uint64_t));
+    if (!p) abort();
+    d->buf = p;
+    memcpy(d->buf + cap, d->buf, d->head * sizeof(uint64_t));
+    d->mask = 2 * cap - 1;
+}
+
+static void dq_push_back(struct deque *d, uint64_t v) {
+    if (d->len > d->mask) dq_grow(d);
+    d->buf[(d->head + d->len) & d->mask] = v;
+    d->len++;
+}
+
+static void dq_push_front(struct deque *d, uint64_t v) {
+    if (d->len > d->mask) dq_grow(d);
+    d->head = (d->head + d->mask) & d->mask;        /* head - 1, modulo the capacity */
+    d->buf[d->head] = v;
+    d->len++;
+}
+
+/* Precondition: d->len > 0. */
+static uint64_t dq_pop_back(struct deque *d) {
+    d->len--;
+    return d->buf[(d->head + d->len) & d->mask];
+}
+
+/* Precondition: d->len > 0. */
+static uint64_t dq_pop_front(struct deque *d) {
+    uint64_t v = d->buf[d->head];
+    d->head = (d->head + 1) & d->mask;
+    d->len--;
+    return v;
+}
+
+/* Precondition: i < d->len. */
+static uint64_t dq_at(const struct deque *d, size_t i) {
+    return d->buf[(d->head + i) & d->mask];
+}
+
+struct dq_state { [[cx::owned]] uint16_t *burst; };
+
+static void *dq_setup(void) {
+    /* weights (out of 16) of each kind in the four phases of the pattern:
+     * grow at the back, grow at the front, steady, shrink; the deque grows
+     * by about 2/64 of the operations over a whole pattern */
+    static const uint8_t weight[4][DQ_KINDS] = {
+        { 7, 3, 2, 2, 1, 1 },
+        { 3, 6, 2, 3, 1, 1 },
+        { 3, 3, 3, 3, 2, 2 },
+        { 2, 1, 5, 6, 1, 1 },
+    };
+    struct dq_state *s = (struct dq_state *)bench_alloc(sizeof *s);
+    s->burst = (uint16_t *)bench_alloc(DQ_BURSTS * sizeof(uint16_t));
+    struct rng r = { 0x636920d871574e69u };
+    for (size_t i = 0; i < DQ_BURSTS; i++) {
+        const uint8_t *w = weight[(i / DQ_PHASE) & 3u];
+        uint32_t pick = rng_below(&r, 16), kind = 0;
+        while (pick >= (uint32_t)w[kind]) {
+            pick -= (uint32_t)w[kind];
+            kind++;
+        }
+        uint32_t len = rng_below(&r, 32), frac = rng_below(&r, 256);
+        s->burst[i] = (uint16_t)((frac << 8) | (len << 3) | kind);
+    }
+    return s;
+}
+
+static uint64_t dq_run(void *state) {
+    const struct dq_state *s = (const struct dq_state *)state;
+    uint64_t h = 0;
+    for (size_t round = 0; round < DQ_ROUNDS; round++) {
+        struct deque d;
+        dq_init(&d);
+        uint64_t next = (uint64_t)round << 32;      /* pushed values, distinct per round */
+        uint64_t acc = 0, sum = 0, popped = 0, empty = 0;
+        for (size_t b = 0; b < DQ_BURSTS; b++) {
+            uint32_t x = s->burst[b];
+            uint32_t kind = x & 7u, n = ((x >> 3) & 31u) + 1;
+            if (kind == DQ_PUSH_BACK) {
+                for (uint32_t k = 0; k < n; k++) {
+                    dq_push_back(&d, next);
+                    next++;
+                }
+            } else if (kind == DQ_PUSH_FRONT) {
+                for (uint32_t k = 0; k < n; k++) {
+                    dq_push_front(&d, next);
+                    next++;
+                }
+            } else if (kind == DQ_POP_BACK || kind == DQ_POP_FRONT) {
+                if (n > d.len) {
+                    empty += n - d.len;
+                    n = (uint32_t)d.len;
+                }
+                for (uint32_t k = 0; k < n; k++) {
+                    uint64_t v = kind == DQ_POP_BACK ? dq_pop_back(&d) : dq_pop_front(&d);
+                    acc ^= v + popped;              /* order-sensitive */
+                    popped++;
+                }
+            } else if (kind == DQ_AT) {
+                /* read a window of up to n elements at a random place */
+                size_t i = (d.len * (x >> 8)) >> 8;
+                size_t end = i + n < d.len ? i + n : d.len;
+                for (; i < end; i++) sum += dq_at(&d, i);
+            } else {
+                /* rotate: move n elements from the front to the back */
+                if (d.len > 0) {
+                    for (uint32_t k = 0; k < n; k++) {
+                        uint64_t v = dq_pop_front(&d);
+                        dq_push_back(&d, v);
+                    }
+                }
+            }
+            if ((b & 255u) == 0) acc = mix(acc, d.len);
+        }
+        h = mix(mix(mix(mix(mix(h, acc), sum), popped), empty), d.len);
+        h = mix(h, d.mask);
+        for (size_t i = 0; i < d.len; i += 1024) h = mix(h, dq_at(&d, i));
+        bench_free(d.buf);
+    }
+    return h;
+}
+
+static void dq_teardown([[cx::escapes]] void *state) {
+    struct dq_state *s = (struct dq_state *)state;
+    bench_free(s->burst);
+    bench_free(s);
+}
+
+extern const struct bench bench_deque = {
+    "deque", "ds", "growable ring-buffer deque of uint64: bursts of push/pop at both ends, indexing, rotation, growth",
+    dq_setup, dq_run, dq_teardown,
 };
 
 /* ---- bitset_ops: set/clear/test, word-wise and/or/xor, popcount ----------- */

@@ -79,7 +79,7 @@ extern const struct bench bench_vector_push = {
 
 /* ---- string_builder: appends of short strings and formatted numbers ------- */
 
-enum { SB_RECORDS = 1 << 17, SB_ROUNDS = 4, SB_WORDS = 64, SB_WORD_MAX = 12 };
+enum { SB_RECORDS = 1 << 17, SB_ROUNDS = 6, SB_WORDS = 64, SB_WORD_MAX = 12 };
 
 struct sb { [[cx::owned]] uint8_t *data; size_t len; size_t cap; };
 
@@ -187,10 +187,11 @@ static uint64_t sb_run(void *state) {
             }
             sb_putc(&b, (uint8_t)((i & 15u) == 15u ? '\n' : ';'));
         }
-        /* FNV-1a 32 over the result, in 64-bit arithmetic with masking */
-        uint64_t f = 2166136261u;
-        for (size_t i = 0; i < b.len; i++) f = ((f ^ (uint64_t)b.data[i]) * 16777619u) & 0xffffffffu;
-        h = mix(mix(h, b.len), f);
+        /* cheap checksum, so the appends dominate: the length, every 64th
+         * byte and the last byte */
+        uint64_t f = 0;
+        for (size_t i = 0; i < b.len; i += 64) f = mix(f, (uint64_t)b.data[i]);
+        h = mix(mix(mix(h, b.len), f), (uint64_t)b.data[b.len - 1]);
         bench_free(b.data);
     }
     return h;

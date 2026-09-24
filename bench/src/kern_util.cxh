@@ -1,0 +1,27 @@
+/* Helpers shared by the kern benchmarks (src/kern_*.c). */
+#ifndef CX_BENCH_KERN_UTIL_H
+#define CX_BENCH_KERN_UTIL_H
+
+#include "bench.cxh"
+
+#include <stdio.h>
+#include <stdlib.h>
+
+/* A self-check in setup() failed: the benchmark would time wrong code. */
+[[noreturn]] static inline void kern_fail(const char *what) {
+    fputs("bench: self-check failed: ", stderr);
+    fputs(what, stderr);
+    fputs("\n", stderr);
+    abort();
+}
+
+/* Fills p[0..n) with pseudo-random bytes. */
+static inline void kern_fill_random(uint8_t *p, size_t n, uint64_t seed) {
+    struct rng r = { seed };
+    for (size_t i = 0; i < n; i += 8) {
+        uint64_t x = rng_next(&r);
+        for (size_t k = 0; k < 8 && i + k < n; k++) p[i + k] = (uint8_t)((x >> (8 * k)) & 0xffu);
+    }
+}
+
+#endif

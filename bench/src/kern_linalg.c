@@ -1,4 +1,4 @@
-/* Numeric kernels: dense matrix multiply, FFT, stencil, spectral norm. */
+/* Numeric kernels: dense matrix multiply, FFT, stencil, spectral norm, sparse matrix-vector product. */
 #include "bench.cxh"
 
 #include <math.h>
@@ -272,21 +272,27 @@ extern const struct bench bench_stencil_2d = {
 
 enum { SN_N = 1000, SN_ITERS = 10 };
 
+/* The size and iteration count are copied into the state in setup, so the
+ * kernel cannot be specialized to compile-time constants. */
 struct spectral {
     [[cx::owned]] double *u;
     [[cx::owned]] double *v;
     [[cx::owned]] double *tmp;
+    size_t n;
+    int iters;
 };
 
 static void *spectral_setup(void) {
     struct spectral *s = (struct spectral *)bench_alloc(sizeof *s);
-    s->u = (double *)bench_alloc(SN_N * sizeof(double));
-    s->v = (double *)bench_alloc(SN_N * sizeof(double));
-    s->tmp = (double *)bench_alloc(SN_N * sizeof(double));
+    s->n = SN_N;
+    s->iters = SN_ITERS;
+    s->u = (double *)bench_alloc(s->n * sizeof(double));
+    s->v = (double *)bench_alloc(s->n * sizeof(double));
+    s->tmp = (double *)bench_alloc(s->n * sizeof(double));
     return s;
 }
 
-/* A(i,j) = 1 / ((i+j)(i+j+1)/2 + i + 1); i, j < SN_N, so no overflow. */
+/* A(i,j) = 1 / ((i+j)(i+j+1)/2 + i + 1); i, j < n = SN_N, so no overflow. */
 static double spectral_a(size_t i, size_t j) {
     size_t ij = i + j;
     return 1.0 / (double)(ij * (ij + 1) / 2 + i + 1);
@@ -315,17 +321,18 @@ static void spectral_atav(const double *v, double *out, double *tmp, size_t n) {
 
 static uint64_t spectral_run(void *state) {
     const struct spectral *s = (const struct spectral *)state;
-    for (size_t i = 0; i < SN_N; i++) s->u[i] = 1.0;
-    for (int it = 0; it < SN_ITERS; it++) {
-        spectral_atav(s->u, s->v, s->tmp, SN_N);
-        spectral_atav(s->v, s->u, s->tmp, SN_N);
+    size_t n = s->n;
+    for (size_t i = 0; i < n; i++) s->u[i] = 1.0;
+    for (int it = 0; it < s->iters; it++) {
+        spectral_atav(s->u, s->v, s->tmp, n);
+        spectral_atav(s->v, s->u, s->tmp, n);
     }
     double vbv = 0.0, vv = 0.0;
-    for (size_t i = 0; i < SN_N; i++) {
+    for (size_t i = 0; i < n; i++) {
         vbv += s->u[i] * s->v[i];
         vv += s->v[i] * s->v[i];
     }
-    return mix_double(mix_double(0, sqrt(vbv / vv)), s->u[SN_N - 1]);
+    return mix_double(mix_double(0, sqrt(vbv / vv)), s->u[n - 1]);
 }
 
 static void spectral_teardown([[cx::escapes]] void *state) {
@@ -339,4 +346,115 @@ static void spectral_teardown([[cx::escapes]] void *state) {
 extern const struct bench bench_spectral_norm = {
     "spectral_norm", "kern", "spectral norm by power iteration, N=1000, 10 iterations",
     spectral_setup, spectral_run, spectral_teardown,
+};
+
+/* ---- spmv_csr: sparse matrix-vector products in CSR form ----------------- */
+
+#ifndef SP_BAND_X
+#define SP_BAND_X 16384
+#define SP_FAR_X 1
+#define SP_REPS_X 3
+#endif
+enum { SP_ROWS = 1 << 20, SP_MINNZ = 8, SP_MAXNZ = 10, SP_REPS = SP_REPS_X, SP_SAMPLE = 1024, SP_BAND = SP_BAND_X, SP_FAR = SP_FAR_X };
+
+/* Row i holds entries rowptr[i] .. rowptr[i+1]-1 of col and val, with
+ * distinct columns in ascending order, spread uniformly over the matrix.
+ * The sizes are copied into the state in setup, so the kernel cannot be
+ * specialized to compile-time constants. */
+struct spmv {
+    [[cx::owned]] uint32_t *rowptr;   /* rows + 1 entries */
+    [[cx::owned]] uint32_t *col;
+    [[cx::owned]] double *val;
+    [[cx::owned]] double *x;          /* input vector */
+    [[cx::owned]] double *y0;         /* products, ping-pong */
+    [[cx::owned]] double *y1;
+    size_t rows, reps;
+};
+
+static void *spmv_setup(void) {
+    struct spmv *s = (struct spmv *)bench_alloc(sizeof *s);
+    s->rows = SP_ROWS;
+    s->reps = SP_REPS;
+    size_t n = s->rows;
+    s->rowptr = (uint32_t *)bench_alloc((n + 1) * sizeof(uint32_t));
+    s->col = (uint32_t *)bench_alloc(n * SP_MAXNZ * sizeof(uint32_t));
+    s->val = (double *)bench_alloc(n * SP_MAXNZ * sizeof(double));
+    s->x = (double *)bench_alloc(n * sizeof(double));
+    s->y0 = (double *)bench_alloc(n * sizeof(double));
+    s->y1 = (double *)bench_alloc(n * sizeof(double));
+    struct rng r = { 0x94d049bb133111ebu };
+    uint32_t nnz = 0;
+    s->rowptr[0] = 0;
+    for (size_t i = 0; i < n; i++) {
+        uint32_t k = SP_MINNZ + rng_below(&r, SP_MAXNZ - SP_MINNZ + 1);
+        uint32_t *c = s->col + nnz;
+        for (uint32_t j = 0; j < k; j++) {
+            uint32_t v = 0;
+            int dup = 1;
+            while (dup) {                                   /* distinct columns */
+                if (j < SP_FAR) v = rng_below(&r, (uint32_t)n);
+                else {
+                    size_t lo = i > SP_BAND ? i - SP_BAND : 0, hi = i + SP_BAND < n ? i + SP_BAND : n - 1;
+                    v = (uint32_t)(lo + rng_below(&r, (uint32_t)(hi - lo + 1)));
+                }
+                dup = 0;
+                for (uint32_t q = 0; q < j; q++)
+                    if (c[q] == v) dup = 1;
+            }
+            uint32_t q = j;                                 /* insertion sort */
+            for (; q > 0 && c[q - 1] > v; q--) c[q] = c[q - 1];
+            c[q] = v;
+        }
+        for (uint32_t j = 0; j < k; j++) s->val[nnz + j] = rng_unit(&r) * 2.0 - 1.0;
+        nnz += k;
+        s->rowptr[i + 1] = nnz;
+    }
+    for (size_t i = 0; i < n; i++) s->x[i] = rng_unit(&r) * 2.0 - 1.0;
+    return s;
+}
+
+/* y = A*x; each row is summed in column order. */
+static void spmv_csr(const uint32_t *rowptr, const uint32_t *col, const double *val,
+                     const double *x, double *y, size_t rows) {
+    for (size_t i = 0; i < rows; i++) {
+        double sum = 0.0;
+        size_t end = rowptr[i + 1];
+        for (size_t k = rowptr[i]; k < end; k++) sum += val[k] * x[col[k]];
+        y[i] = sum;
+    }
+}
+
+/* reps chained products A*x, A*(A*x), ...; checksum of the last one: every
+ * SP_SAMPLE-th entry and the sum of all entries. */
+static uint64_t spmv_run(void *state) {
+    const struct spmv *s = (const struct spmv *)state;
+    size_t n = s->rows;
+    const double *in = s->x;
+    double *out = s->y0;
+    for (size_t rep = 0; rep < s->reps; rep++) {
+        spmv_csr(s->rowptr, s->col, s->val, in, out, n);
+        in = out;
+        out = out == s->y0 ? s->y1 : s->y0;
+    }
+    uint64_t h = 0;
+    double sum = 0.0;
+    for (size_t i = 0; i < n; i++) sum += in[i];
+    for (size_t i = 0; i < n; i += SP_SAMPLE) h = mix_double(h, in[i]);
+    return mix_double(h, sum);
+}
+
+static void spmv_teardown([[cx::escapes]] void *state) {
+    struct spmv *s = (struct spmv *)state;
+    bench_free(s->rowptr);
+    bench_free(s->col);
+    bench_free(s->val);
+    bench_free(s->x);
+    bench_free(s->y0);
+    bench_free(s->y1);
+    bench_free(s);
+}
+
+extern const struct bench bench_spmv_csr = {
+    "spmv_csr", "kern", "double CSR sparse matrix-vector product, 1M rows x 8-10 random columns, 4 chained",
+    spmv_setup, spmv_run, spmv_teardown,
 };

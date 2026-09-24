@@ -12,7 +12,7 @@
 
 enum { BRANCH_N = 1 << 16, BRANCH_RANDOM_PASSES = 160, BRANCH_SORTED_PASSES = 560 };
 
-struct branch { uint32_t *d; };
+struct branch { [[cx::owned]] uint32_t *d; };
 
 static uint64_t branch_kernel(const uint32_t *d, size_t n, uint64_t seed) {
     uint32_t hist[16] = { 0 };
@@ -93,7 +93,7 @@ enum vm_op {
 
 struct vm_insn { uint8_t op; uint8_t r; uint16_t imm; };
 
-struct vm { struct vm_insn *code; };
+struct vm { [[cx::owned]] struct vm_insn *code; };
 
 static const uint64_t VM_MASK = 0xffffffffu;
 
@@ -161,11 +161,126 @@ extern const struct bench bench_switch_dispatch = {
     vm_setup, vm_run, vm_teardown,
 };
 
+/* ---- dispatch_table: the same interpreter through a handler table --------
+ * The switch_dispatch program and semantics, but each opcode is a static
+ * handler in this file and dispatch is an indirect call through a
+ * module-private `static const` table (spec §18.5). The set of targets is
+ * closed and visible: in Cx the table and the handlers are module-private, so
+ * every call site has a known callee list and known handler effects (compare
+ * call_indirect, whose targets are extern and in another file). It computes
+ * exactly what switch_dispatch computes, so the two checksums are equal. */
+
+struct dt_vm { uint64_t reg[8]; uint64_t acc; };
+
+/* runs the instruction at pc and returns the next pc */
+typedef size_t (*dt_handler)(struct dt_vm *vm, const struct vm_insn *in, size_t pc);
+
+static size_t dt_loadi(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    vm->reg[in->r] = in->imm;
+    return pc + 1;
+}
+static size_t dt_add(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    vm->acc = (vm->acc + vm->reg[in->r]) & VM_MASK;
+    return pc + 1;
+}
+static size_t dt_sub(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    vm->acc = (vm->acc + (VM_MASK + 1) - vm->reg[in->r]) & VM_MASK;
+    return pc + 1;
+}
+static size_t dt_mul(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    vm->acc = (vm->acc * (vm->reg[in->r] & 0xffff)) & VM_MASK;
+    return pc + 1;
+}
+static size_t dt_xor(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    vm->acc ^= vm->reg[in->r];
+    return pc + 1;
+}
+static size_t dt_and(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    vm->acc &= vm->reg[in->r] | (uint64_t)in->imm;
+    return pc + 1;
+}
+static size_t dt_or(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    vm->acc |= vm->reg[in->r] & (uint64_t)in->imm;
+    return pc + 1;
+}
+static size_t dt_shl(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    vm->acc = (vm->acc << (vm->reg[in->r] & 7)) & VM_MASK;
+    return pc + 1;
+}
+static size_t dt_shr(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    vm->acc >>= vm->reg[in->r] & 7;
+    return pc + 1;
+}
+static size_t dt_addi(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    vm->acc = (vm->acc + (uint64_t)in->imm) & VM_MASK;
+    return pc + 1;
+}
+static size_t dt_subi(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    uint64_t imm = in->imm;
+    vm->acc = vm->acc >= imm ? vm->acc - imm : vm->acc + (VM_MASK + 1) - imm;
+    return pc + 1;
+}
+static size_t dt_store(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    vm->reg[in->r] = vm->acc;
+    return pc + 1;
+}
+static size_t dt_load(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    vm->acc = vm->reg[in->r];
+    return pc + 1;
+}
+static size_t dt_swap(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    uint64_t t = vm->reg[in->r];
+    vm->reg[in->r] = vm->acc;
+    vm->acc = t;
+    return pc + 1;
+}
+static size_t dt_skipodd(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    (void)in;
+    return pc + 1 + (vm->acc & 1);
+}
+static size_t dt_rot(struct dt_vm *vm, const struct vm_insn *in, size_t pc) {
+    (void)in;
+    vm->acc = ((vm->acc << 5) | (vm->acc >> 27)) & VM_MASK;
+    return pc + 1;
+}
+
+/* Defined after the handlers (Cx has no tentative definitions); every opcode
+ * in the program is < VM_NOPS. */
+static const dt_handler dt_ops[VM_NOPS] = {
+    [OP_LOADI] = dt_loadi, [OP_ADD] = dt_add, [OP_SUB] = dt_sub, [OP_MUL] = dt_mul,
+    [OP_XOR] = dt_xor, [OP_AND] = dt_and, [OP_OR] = dt_or, [OP_SHL] = dt_shl,
+    [OP_SHR] = dt_shr, [OP_ADDI] = dt_addi, [OP_SUBI] = dt_subi, [OP_STORE] = dt_store,
+    [OP_LOAD] = dt_load, [OP_SWAP] = dt_swap, [OP_SKIPODD] = dt_skipodd, [OP_ROT] = dt_rot,
+};
+
+static uint64_t dt_exec(const struct vm_insn *code, size_t n, uint64_t seed) {
+    struct dt_vm vm;
+    for (size_t k = 0; k < 8; k++) vm.reg[k] = (seed + k * 0x9e3779b9u) & VM_MASK;
+    vm.acc = seed & VM_MASK;
+    size_t pc = 0;
+    while (pc < n) pc = dt_ops[code[pc].op](&vm, &code[pc], pc);
+    uint64_t h = mix(0, vm.acc);
+    for (size_t k = 0; k < 8; k++) h = mix(h, vm.reg[k]);
+    return h;
+}
+
+static uint64_t dt_run(void *state) {
+    const struct vm *s = (const struct vm *)state;
+    uint64_t h = 0;
+    for (uint64_t run = 0; run < VM_RUNS; run++) h = mix(h, dt_exec(s->code, VM_LEN, run * 7919 + 1));
+    return h;
+}
+
+extern const struct bench bench_dispatch_table = {
+    "dispatch_table", "ops", "switch_dispatch's interpreter via a static const table of static handlers",
+    vm_setup, dt_run, vm_teardown,
+};
+
 /* ---- call_direct: calls to small functions in another translation unit --- */
 
 enum { CALLD_N = 1 << 14, CALLD_PASSES = 480 };
 
-struct calld { int32_t *v; };
+struct calld { [[cx::owned]] int32_t *v; };
 
 static void *calld_setup(void) {
     struct calld *s = (struct calld *)bench_alloc(sizeof *s);
@@ -207,7 +322,7 @@ extern const struct bench bench_call_direct = {
 
 enum { CALLI_N = 1 << 16, CALLI_PASSES = 360, CALLI_BLOCK = 16 };
 
-struct calli { uint8_t *sel; int64_t *val; ct_binop fn[8]; };
+struct calli { [[cx::owned]] uint8_t *sel; [[cx::owned]] int64_t *val; ct_binop fn[8]; };
 
 static void *calli_setup(void) {
     struct calli *s = (struct calli *)bench_alloc(sizeof *s);
@@ -259,9 +374,9 @@ extern const struct bench bench_call_indirect = {
 
 enum { REC_FIB_N = 34, REC_NODES = 1 << 16, REC_TREE_PASSES = 30 };
 
-struct tnode { struct tnode *left; struct tnode *right; int64_t val; };
+struct tnode { struct tnode *left; struct tnode *right; int64_t val; };   /* borrowed: into pool */
 
-struct rec { struct tnode *pool; int64_t fib_n; };
+struct rec { [[cx::owned]] struct tnode *pool; int64_t fib_n; };
 
 static int64_t rec_fib(int64_t n) { return n < 2 ? n : rec_fib(n - 1) + rec_fib(n - 2); }
 
@@ -322,7 +437,7 @@ extern const struct bench bench_recursion = {
 
 enum { SP_N = 1 << 14, SP_PASSES = 240 };
 
-struct spass { int64_t *k; struct sp24 *v24; struct sp32 *v32; };
+struct spass { [[cx::owned]] int64_t *k; [[cx::owned]] struct sp24 *v24; [[cx::owned]] struct sp32 *v32; };
 
 static void *spass_setup(void) {
     struct spass *s = (struct spass *)bench_alloc(sizeof *s);

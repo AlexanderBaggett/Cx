@@ -7,12 +7,12 @@
 /* ---- shared: CSR graphs ------------------------------------------------- */
 
 /* Adjacency of vertex v is adj[off[v] .. off[v + 1]); w[] (if any) holds the
- * matching edge weights. */
+ * matching edge weights. The graph owns its arrays. */
 struct csr {
     uint32_t nv;
-    uint32_t *off;
-    uint32_t *adj;
-    uint32_t *w;
+    [[cx::owned]] uint32_t *off;
+    [[cx::owned]] uint32_t *adj;
+    [[cx::owned]] uint32_t *w;      /* NULL for an unweighted graph */
 };
 
 /* Directed graph: each vertex gets an out-degree in [dmin, dmax] and uniformly
@@ -104,7 +104,7 @@ static size_t bfs(const uint32_t *off, const uint32_t *adj, uint32_t nv, uint32_
     return tail;
 }
 
-struct graph_bfs { struct csr g; uint32_t *dist; uint32_t *queue; };
+struct graph_bfs { struct csr g; [[cx::owned]] uint32_t *dist; [[cx::owned]] uint32_t *queue; };
 
 static void *graph_bfs_setup(void) {
     struct graph_bfs *s = (struct graph_bfs *)bench_alloc(sizeof *s);
@@ -193,7 +193,12 @@ static struct dfs_result dfs_components(const uint32_t *off, const uint32_t *adj
     return res;
 }
 
-struct graph_dfs { struct csr g; uint32_t *comp; uint32_t *pos; uint32_t *stack; };
+struct graph_dfs {
+    struct csr g;
+    [[cx::owned]] uint32_t *comp;
+    [[cx::owned]] uint32_t *pos;
+    [[cx::owned]] uint32_t *stack;
+};
 
 static void *graph_dfs_setup(void) {
     struct graph_dfs *s = (struct graph_dfs *)bench_alloc(sizeof *s);
@@ -307,7 +312,12 @@ static void dijkstra(const struct csr *g, uint32_t src, uint32_t *dist, uint32_t
     }
 }
 
-struct graph_dijkstra { struct csr g; uint32_t *dist; uint32_t *heap; uint32_t *where; };
+struct graph_dijkstra {
+    struct csr g;
+    [[cx::owned]] uint32_t *dist;
+    [[cx::owned]] uint32_t *heap;
+    [[cx::owned]] uint32_t *where;
+};
 
 static void *graph_dijkstra_setup(void) {
     struct graph_dijkstra *s = (struct graph_dijkstra *)bench_alloc(sizeof *s);

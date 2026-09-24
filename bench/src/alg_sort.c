@@ -77,7 +77,7 @@ static void i32_quick_sort(int32_t *a, size_t n) {
     i32_insertion_sort(a, n);
 }
 
-struct sort_quick { int32_t *in; int32_t *buf; };
+struct sort_quick { [[cx::owned]] int32_t *in; [[cx::owned]] int32_t *buf; };
 
 static void *sort_quick_setup(void) {
     struct sort_quick *s = (struct sort_quick *)bench_alloc(sizeof *s);
@@ -127,7 +127,7 @@ static void i32_merge(int32_t *dst, const int32_t *src, size_t lo, size_t mid, s
     while (j < hi) { dst[k] = src[j]; j++; k++; }
 }
 
-struct sort_merge { int32_t *in; int32_t *a; int32_t *b; };
+struct sort_merge { [[cx::owned]] int32_t *in; [[cx::owned]] int32_t *a; [[cx::owned]] int32_t *b; };
 
 static void *sort_merge_setup(void) {
     struct sort_merge *s = (struct sort_merge *)bench_alloc(sizeof *s);
@@ -196,7 +196,7 @@ static void i32_heap_sort(int32_t *a, size_t n) {
     }
 }
 
-struct sort_heap { int32_t *in; int32_t *buf; };
+struct sort_heap { [[cx::owned]] int32_t *in; [[cx::owned]] int32_t *buf; };
 
 static void *sort_heap_setup(void) {
     struct sort_heap *s = (struct sort_heap *)bench_alloc(sizeof *s);
@@ -264,7 +264,7 @@ static void u32_radix_sort(uint32_t *a, uint32_t *tmp, size_t n) {
     }
 }
 
-struct sort_radix { uint32_t *in; uint32_t *a; uint32_t *tmp; };
+struct sort_radix { [[cx::owned]] uint32_t *in; [[cx::owned]] uint32_t *a; [[cx::owned]] uint32_t *tmp; };
 
 static void *sort_radix_setup(void) {
     struct sort_radix *s = (struct sort_radix *)bench_alloc(sizeof *s);
@@ -308,7 +308,7 @@ static int i32_cmp(const void *pa, const void *pb) {
     return (a > b) - (a < b);
 }
 
-struct sort_qsort { int32_t *in; int32_t *buf; };
+struct sort_qsort { [[cx::owned]] int32_t *in; [[cx::owned]] int32_t *buf; };
 
 static void *sort_qsort_setup(void) {
     struct sort_qsort *s = (struct sort_qsort *)bench_alloc(sizeof *s);
@@ -342,9 +342,9 @@ extern const struct bench bench_sort_qsort = {
 enum { SMALL_TOTAL = 1 << 22, SMALL_MIN = 8, SMALL_MAX = 32 };
 
 struct sort_small {
-    int32_t *in;
-    int32_t *buf;
-    uint8_t *len;   /* length of each array; they are stored back to back */
+    [[cx::owned]] int32_t *in;
+    [[cx::owned]] int32_t *buf;
+    [[cx::owned]] uint8_t *len;     /* length of each array; they are stored back to back */
     size_t nseg;
 };
 
@@ -448,10 +448,12 @@ static void str_quick_sort(const char **a, size_t n) {
     str_insertion_sort(a, n);
 }
 
+/* in[] and buf[] own their pointer arrays; the pointers in them are shared
+ * references into text. */
 struct sort_strings {
-    char *text;         /* all strings, NUL-terminated, back to back */
-    const char **in;    /* generation order */
-    const char **buf;
+    [[cx::owned]] char *text;           /* all strings, NUL-terminated, back to back */
+    [[cx::owned]] const char **in;      /* generation order */
+    [[cx::owned]] const char **buf;
 };
 
 static void *sort_strings_setup(void) {
@@ -480,7 +482,7 @@ static uint64_t sort_strings_run(void *state) {
     for (size_t i = 0; i < STR_N; i += 8) {
         const char *p = s->buf[i];
         uint64_t v = 0;
-        for (size_t k = 0; k < 8 && p[k] != '\0'; k++) v = (v << 8) | (uint8_t)p[k];
+        for (size_t k = 0; k < 8 && p[k] != '\0'; k++) v = (v << 8) | (uint64_t)(uint8_t)p[k];
         h = mix(h, v);
     }
     return h;

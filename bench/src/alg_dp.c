@@ -31,9 +31,10 @@ static uint32_t edit_distance(const uint8_t *a, size_t n, const uint8_t *b, size
 }
 
 struct dp_edit_distance {
-    uint8_t *str;                   /* 2 * ED_PAIRS strings of up to ED_MAXLEN bytes */
+    [[cx::owned]] uint8_t *str;     /* 2 * ED_PAIRS strings of up to ED_MAXLEN bytes */
     size_t len[2 * ED_PAIRS];
-    uint32_t *row0, *row1;
+    [[cx::owned]] uint32_t *row0;
+    [[cx::owned]] uint32_t *row1;
 };
 
 static void *dp_edit_distance_setup(void) {
@@ -92,7 +93,7 @@ extern const struct bench bench_dp_edit_distance = {
 
 enum { KS_ITEMS = 1000, KS_CAP = 100000, KS_WMIN = 20, KS_WMAX = 2000, KS_VMAX = 1000 };
 
-struct dp_knapsack { uint32_t *wt; uint32_t *val; uint32_t *best; };
+struct dp_knapsack { [[cx::owned]] uint32_t *wt; [[cx::owned]] uint32_t *val; [[cx::owned]] uint32_t *best; };
 
 static void *dp_knapsack_setup(void) {
     struct dp_knapsack *s = (struct dp_knapsack *)bench_alloc(sizeof *s);
