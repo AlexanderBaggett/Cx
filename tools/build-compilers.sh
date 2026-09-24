@@ -7,6 +7,7 @@
 # Both use exactly the same CMake configuration, so any difference between the
 # two compilers comes from the sources under cx/. Each build includes the
 # compiler-rt sanitizer runtimes (ASan, UBSan) used by `make check` in bench/.
+# (compiler-rt always builds UBSan, so only asan is listed explicitly.)
 #
 #   tools/build-compilers.sh [ref|cx|both]      (default: both)
 #
@@ -40,7 +41,7 @@ build() {  # build <source root> <build dir>
         -DLLVM_ENABLE_ZSTD=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_LIBXML2=OFF \
         -DLLVM_PARALLEL_LINK_JOBS=1 \
         -DLLVM_ENABLE_RUNTIMES=compiler-rt \
-        -DCOMPILER_RT_SANITIZERS_TO_BUILD="asan;ubsan" \
+        -DCOMPILER_RT_SANITIZERS_TO_BUILD=asan \
         -DCOMPILER_RT_BUILD_XRAY=OFF -DCOMPILER_RT_BUILD_LIBFUZZER=OFF -DCOMPILER_RT_BUILD_MEMPROF=OFF \
         -DCOMPILER_RT_BUILD_ORC=OFF -DCOMPILER_RT_BUILD_CTX_PROFILE=OFF -DCOMPILER_RT_BUILD_GWP_ASAN=OFF \
         > "$out/cmake.log"
