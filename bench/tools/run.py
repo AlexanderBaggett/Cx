@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+"""Run the head-to-head benchmarks.
+
+For every round, the benchmarks are visited in a shuffled order. For each
+benchmark, the toolchain binaries (c, cx, ctrl) run back to back in a shuffled
+order, each in a fresh process pinned to one CPU. `ctrl` is a byte-identical
+copy of the C binary, so c-vs-ctrl measures the noise floor.
+
+Output: results/<timestamp>.jsonl. The first line is metadata; each further
+line is one process run:
+  {"round": r, "bench": name, "tc": "c"|"cx"|"ctrl", "ns": [...], "checksum": "0x..", "stable": true}
+"""
+import argparse, datetime, json, os, platform, random, subprocess, sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+
+
+def sh(cmd):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, check=True).stdout.strip()
+    except Exception as e:  # noqa: BLE001 - metadata only
+        return f"unavailable: {e}"
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--rounds", type=int, default=5)
+    ap.add_argument("--iters", type=int, default=7)
+    ap.add_argument("--cpu", default="3", help="CPU to pin every run to")
+    ap.add_argument("--build", default=os.path.join(ROOT, "build"))
+    ap.add_argument("--toolchains", default="c,cx,ctrl")
+    ap.add_argument("--filter", default="", help="comma-separated benchmark names")
+    ap.add_argument("--seed", type=int, default=None)
+    a = ap.parse_args()
+
+    tcs = a.toolchains.split(",")
+    bins = {tc: os.path.join(a.build, tc, "bench") for tc in tcs}
+    for tc, b in bins.items():
+        if not os.access(b, os.X_OK):
+            sys.exit(f"run.py: missing {b} (run `make` first)")
+
+    lists = {tc: sh([b, "--list"]) for tc, b in bins.items()}
+    if len(set(lists.values())) != 1:
+        sys.exit("run.py: toolchains disagree on the benchmark list")
+    names = [ln.split()[0] for ln in lists[tcs[0]].splitlines()]
+    if a.filter:
+        keep = set(a.filter.split(","))
+        names = [n for n in names if n in keep]
+
+    os.makedirs(os.path.join(ROOT, "results"), exist_ok=True)
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    path = os.path.join(ROOT, "results", f"{stamp}.jsonl")
+    rnd = random.Random(a.seed)
+    meta = {
+        "meta": {
+            "time": stamp, "rounds": a.rounds, "iters": a.iters, "cpu": a.cpu,
+            "toolchains": tcs, "benchmarks": names,
+            "machine": {"platform": platform.platform(), "processor": sh(["sh", "-c", "grep -m1 'model name' /proc/cpuinfo"]),
+                        "nproc": os.cpu_count()},
+            "compilers": {"c": sh([os.environ.get("CC_C", os.path.expanduser("~/llvm-23.1.2-release/bin/clang")), "--version"]).splitlines()[:1],
+                          "cx": sh([os.environ.get("CC_CX", os.path.join(ROOT, "..", "..", "cx-build", "bin", "clang")), "--version"]).splitlines()[:1]},
+            "cx_flags": os.environ.get("CX_FLAGS", ""),
+        }
+    }
+    with open(path, "w") as out:
+        out.write(json.dumps(meta) + "\n")
+        for r in range(a.rounds):
+            order = names[:]
+            rnd.shuffle(order)
+            for i, name in enumerate(order):
+                runs = tcs[:]
+                rnd.shuffle(runs)
+                for tc in runs:
+                    p = subprocess.run(["taskset", "-c", a.cpu, bins[tc], name, "--iters", str(a.iters)],
+                                       capture_output=True, text=True)
+                    if p.returncode != 0 or not p.stdout.strip():
+                        rec = {"round": r, "bench": name, "tc": tc, "error": p.stderr.strip()[-500:], "rc": p.returncode}
+                    else:
+                        j = json.loads(p.stdout.strip().splitlines()[-1])
+                        rec = {"round": r, "bench": name, "tc": tc, "ns": j["ns"], "checksum": j["checksum"], "stable": j["stable"]}
+                    out.write(json.dumps(rec) + "\n")
+                    out.flush()
+                print(f"\rround {r + 1}/{a.rounds}: {i + 1}/{len(order)} {name:<24}", end="", flush=True)
+            print()
+    print(f"results: {path}")
+
+
+if __name__ == "__main__":
+    main()
