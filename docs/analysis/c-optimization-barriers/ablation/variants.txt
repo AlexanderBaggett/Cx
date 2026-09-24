@@ -1,0 +1,10 @@
+base|
+nosa|-fno-strict-aliasing
+wrapv|-fwrapv
+noerrno|-fno-math-errno
+fastmath|-ffast-math
+nonull|-fno-delete-null-pointer-checks
+nofinite|-fno-finite-loops
+kernel|-fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks
+nobuiltin|-fno-builtin
+native|-march=native
