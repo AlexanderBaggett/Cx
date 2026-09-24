@@ -350,15 +350,20 @@ extern const struct bench bench_spectral_norm = {
 
 /* ---- spmv_csr: sparse matrix-vector products in CSR form ----------------- */
 
-#ifndef SP_BAND_X
-#define SP_BAND_X 16384
-#define SP_FAR_X 1
-#define SP_REPS_X 3
-#endif
-enum { SP_ROWS = 1 << 20, SP_MINNZ = 8, SP_MAXNZ = 10, SP_REPS = SP_REPS_X, SP_SAMPLE = 1024, SP_BAND = SP_BAND_X, SP_FAR = SP_FAR_X };
+enum {
+    SP_ROWS = 1 << 20,
+    SP_MINNZ = 8,
+    SP_MAXNZ = 10,
+    SP_BAND = 8192,       /* columns lie within this distance of the diagonal */
+    SP_REPS = 3,
+    SP_SAMPLE = 1024,
+};
 
-/* Row i holds entries rowptr[i] .. rowptr[i+1]-1 of col and val, with
- * distinct columns in ascending order, spread uniformly over the matrix.
+/* Row i holds entries rowptr[i] .. rowptr[i+1]-1 of col and val: distinct
+ * random columns in ascending order, uniform within SP_BAND of the diagonal
+ * (like a mesh matrix after bandwidth-reducing reordering). Uniform columns
+ * over all 1M rows would make every x access a cache miss, and the benchmark
+ * a DRAM latency test.
  * The sizes are copied into the state in setup, so the kernel cannot be
  * specialized to compile-time constants. */
 struct spmv {
@@ -388,15 +393,12 @@ static void *spmv_setup(void) {
     for (size_t i = 0; i < n; i++) {
         uint32_t k = SP_MINNZ + rng_below(&r, SP_MAXNZ - SP_MINNZ + 1);
         uint32_t *c = s->col + nnz;
+        size_t lo = i > SP_BAND ? i - SP_BAND : 0, hi = i + SP_BAND < n ? i + SP_BAND : n - 1;
         for (uint32_t j = 0; j < k; j++) {
             uint32_t v = 0;
             int dup = 1;
             while (dup) {                                   /* distinct columns */
-                if (j < SP_FAR) v = rng_below(&r, (uint32_t)n);
-                else {
-                    size_t lo = i > SP_BAND ? i - SP_BAND : 0, hi = i + SP_BAND < n ? i + SP_BAND : n - 1;
-                    v = (uint32_t)(lo + rng_below(&r, (uint32_t)(hi - lo + 1)));
-                }
+                v = (uint32_t)(lo + rng_below(&r, (uint32_t)(hi - lo + 1)));
                 dup = 0;
                 for (uint32_t q = 0; q < j; q++)
                     if (c[q] == v) dup = 1;
@@ -455,6 +457,6 @@ static void spmv_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_spmv_csr = {
-    "spmv_csr", "kern", "double CSR sparse matrix-vector product, 1M rows x 8-10 random columns, 4 chained",
+    "spmv_csr", "kern", "double CSR sparse matrix-vector product, 1M rows x 8-10 banded random columns, 3 chained",
     spmv_setup, spmv_run, spmv_teardown,
 };

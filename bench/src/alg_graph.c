@@ -1,5 +1,6 @@
 /* Graph algorithms on random sparse graphs in CSR form: BFS, iterative DFS
- * (connected components) and Dijkstra with a binary heap. */
+ * (connected components), Dijkstra with a binary heap and Kahn's topological
+ * sort. */
 #include "bench.cxh"
 
 #include <string.h>
@@ -357,4 +358,151 @@ static void graph_dijkstra_teardown([[cx::escapes]] void *state) {
 extern const struct bench bench_graph_dijkstra = {
     "graph_dijkstra", "alg", "Dijkstra with an indexed binary heap on a weighted random graph (128K vertices, 1M edges)",
     graph_dijkstra_setup, graph_dijkstra_run, graph_dijkstra_teardown,
+};
+
+/* ---- topo_sort: Kahn's algorithm on a random DAG ------------------------- */
+
+enum { TOPO_V = 1 << 18, TOPO_DMIN = 4, TOPO_DMAX = 28, TOPO_NEAR = 64, TOPO_BLOCK = 1 << 12 };
+
+/* Random DAG. Vertex ids are a hidden topological order, shuffled within
+ * blocks of `block` positions (nv is a multiple of block): like real task
+ * graphs, ids are local but not sorted. The vertex at hidden position p has
+ * dmin..dmax edges (repeats allowed) to later positions, alternately within
+ * the next `near` positions (long dependency chains) and anywhere later. The
+ * last position has none. */
+static void csr_random_dag(struct csr *g, uint32_t nv, uint32_t dmin, uint32_t dmax, uint32_t near,
+                           uint32_t block, uint64_t seed) {
+    struct rng r = { seed };
+    uint32_t *perm = (uint32_t *)bench_alloc((size_t)nv * sizeof(uint32_t));   /* position -> vertex */
+    uint32_t *at = (uint32_t *)bench_alloc((size_t)nv * sizeof(uint32_t));     /* vertex -> position */
+    for (uint32_t p = 0; p < nv; p++) perm[p] = p;
+    for (uint32_t b = 0; b < nv; b += block) {
+        for (uint32_t k = block - 1; k > 0; k--) {
+            uint32_t q = b + rng_below(&r, k + 1);
+            uint32_t t = perm[b + k];
+            perm[b + k] = perm[q];
+            perm[q] = t;
+        }
+    }
+    for (uint32_t p = 0; p < nv; p++) at[perm[p]] = p;
+    g->nv = nv;
+    g->off = (uint32_t *)bench_alloc(((size_t)nv + 1) * sizeof(uint32_t));
+    g->off[0] = 0;
+    for (uint32_t v = 0; v < nv; v++) {
+        uint32_t deg = at[v] == nv - 1 ? 0 : dmin + rng_below(&r, dmax - dmin + 1);
+        g->off[v + 1] = g->off[v] + deg;
+    }
+    g->adj = (uint32_t *)bench_alloc((size_t)g->off[nv] * sizeof(uint32_t));
+    for (uint32_t v = 0; v < nv; v++) {
+        uint32_t p = at[v], later = nv - 1 - p;        /* positions after p */
+        for (uint32_t e = g->off[v]; e < g->off[v + 1]; e++) {
+            uint32_t span = (e & 1u) != 0 && later > near ? near : later;
+            g->adj[e] = perm[p + 1 + rng_below(&r, span)];
+        }
+    }
+    g->w = NULL;
+    bench_free(perm);
+    bench_free(at);
+}
+
+/* t = g with every edge reversed (unweighted). */
+static void csr_transpose(const struct csr *g, struct csr *t) {
+    uint32_t nv = g->nv;
+    size_t ne = g->off[nv];
+    t->nv = nv;
+    t->off = (uint32_t *)bench_zalloc(((size_t)nv + 1) * sizeof(uint32_t));
+    for (size_t e = 0; e < ne; e++) t->off[g->adj[e] + 1]++;
+    for (uint32_t v = 0; v < nv; v++) t->off[v + 1] += t->off[v];
+    uint32_t *fill = (uint32_t *)bench_alloc((size_t)nv * sizeof(uint32_t));
+    memcpy(fill, t->off, (size_t)nv * sizeof(uint32_t));
+    t->adj = (uint32_t *)bench_alloc(ne * sizeof(uint32_t));
+    for (uint32_t u = 0; u < nv; u++) {
+        for (uint32_t e = g->off[u]; e < g->off[u + 1]; e++) {
+            uint32_t v = g->adj[e];
+            t->adj[fill[v]] = u;
+            fill[v]++;
+        }
+    }
+    t->w = NULL;
+    bench_free(fill);
+}
+
+/* Kahn's algorithm: order[] receives a topological order and doubles as the
+ * FIFO queue, order[head..tail) being the vertices whose predecessors have
+ * all been output. Returns the number of vertices output (all of them, as
+ * the graph is acyclic). */
+static size_t kahn(const struct csr *g, uint32_t *indeg, uint32_t *order) {
+    const uint32_t *off = g->off, *adj = g->adj;
+    uint32_t nv = g->nv;
+    memset(indeg, 0, (size_t)nv * sizeof(uint32_t));
+    for (uint32_t e = 0; e < off[nv]; e++) indeg[adj[e]]++;
+    size_t tail = 0;
+    for (uint32_t v = 0; v < nv; v++) {
+        if (indeg[v] == 0) {
+            order[tail] = v;
+            tail++;
+        }
+    }
+    for (size_t head = 0; head < tail; head++) {
+        uint32_t u = order[head];
+        for (uint32_t e = off[u]; e < off[u + 1]; e++) {
+            uint32_t v = adj[e];
+            indeg[v]--;
+            if (indeg[v] == 0) {
+                order[tail] = v;
+                tail++;
+            }
+        }
+    }
+    return tail;
+}
+
+/* The order: its length, every 256th vertex, and a position-weighted sum of
+ * all of it (below 2^18 * 2^16 * 2^16). */
+static uint64_t topo_checksum(uint64_t h, const uint32_t *order, size_t n) {
+    uint64_t wsum = 0;
+    for (size_t i = 0; i < n; i++) wsum += (i & 0xffffu) * (order[i] & 0xffffu);
+    h = mix(h, n);
+    for (size_t i = 0; i < n; i += 256) h = mix(h, order[i]);
+    return mix(h, wsum);
+}
+
+/* g is the DAG; gt, its transpose, yields a reverse topological order (every
+ * vertex after all of its successors in g). */
+struct topo_sort {
+    struct csr g;
+    struct csr gt;
+    [[cx::owned]] uint32_t *indeg;
+    [[cx::owned]] uint32_t *order;
+};
+
+static void *topo_sort_setup(void) {
+    struct topo_sort *s = (struct topo_sort *)bench_alloc(sizeof *s);
+    csr_random_dag(&s->g, TOPO_V, TOPO_DMIN, TOPO_DMAX, TOPO_NEAR, TOPO_BLOCK, 0x5eed0204u);
+    csr_transpose(&s->g, &s->gt);
+    s->indeg = (uint32_t *)bench_alloc(TOPO_V * sizeof(uint32_t));
+    s->order = (uint32_t *)bench_alloc(TOPO_V * sizeof(uint32_t));
+    return s;
+}
+
+static uint64_t topo_sort_run(void *state) {
+    const struct topo_sort *s = (const struct topo_sort *)state;
+    size_t n = kahn(&s->g, s->indeg, s->order);
+    uint64_t h = topo_checksum(0, s->order, n);
+    n = kahn(&s->gt, s->indeg, s->order);
+    return topo_checksum(h, s->order, n);
+}
+
+static void topo_sort_teardown([[cx::escapes]] void *state) {
+    struct topo_sort *s = (struct topo_sort *)state;
+    csr_free(&s->g);
+    csr_free(&s->gt);
+    bench_free(s->indeg);
+    bench_free(s->order);
+    bench_free(s);
+}
+
+extern const struct bench bench_topo_sort = {
+    "topo_sort", "alg", "Kahn's topological sort (FIFO queue) of a random DAG and its transpose in CSR form (256K vertices, 4M edges)",
+    topo_sort_setup, topo_sort_run, topo_sort_teardown,
 };

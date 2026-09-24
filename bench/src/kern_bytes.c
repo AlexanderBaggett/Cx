@@ -7,7 +7,7 @@
 /* ---- varint_codec: LEB128 encode + decode through a buffer struct -------- */
 
 enum {
-    VI_COUNT = 5000000,
+    VI_COUNT = 2500000,
     VI_MAXLEN = 10,       /* bytes in the longest encoding of a uint64_t */
 };
 
@@ -84,6 +84,45 @@ static size_t varint_size(uint64_t v) {
     return len;
 }
 
+/* Known encodings, and inputs the decoder must reject (value 0, err 2). */
+struct vi_case { uint8_t bytes[VI_MAXLEN]; uint8_t len, valid; uint64_t value; };
+static const struct vi_case vi_cases[] = {
+    { { 0x00 }, 1, 1, 0 },
+    { { 0x7f }, 1, 1, 127 },
+    { { 0x80, 0x01 }, 2, 1, 128 },
+    { { 0xac, 0x02 }, 2, 1, 300 },
+    { { 0xff, 0xff, 0x03 }, 3, 1, 0xffff },
+    { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01 }, 10, 1, 0xffffffffffffffffu },
+    { { 0x80, 0x80 }, 2, 0, 0 },                                                  /* truncated */
+    { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x02 }, 10, 0, 0 }, /* over 64 bits */
+    { { 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80 }, 10, 0, 0 }, /* over 10 bytes */
+};
+
+/* Runs through the same encode and decode loops as the benchmark, so that
+ * vbuf_put and vbuf_get each keep a single caller and are inlined there. */
+static void varint_selftest(void) {
+    struct vbuf t = { (uint8_t *)bench_alloc(VI_MAXLEN), VI_MAXLEN, 0, 0, 0 };
+    for (size_t i = 0; i < sizeof vi_cases / sizeof vi_cases[0]; i++) {
+        const struct vi_case *c = &vi_cases[i];
+        size_t n = c->len;
+        int ok = 1;
+        if (c->valid) {                                   /* encodes to exactly these bytes */
+            t.err = 0;
+            varint_encode(&t, &c->value, 1);
+            ok = t.err == 0 && t.len == n && varint_size(c->value) == n && memcmp(t.data, c->bytes, n) == 0;
+        }
+        memcpy(t.data, c->bytes, n);
+        t.len = n;
+        t.err = 0;
+        uint64_t v = 1;
+        size_t k = varint_decode(&t, &v, 1);
+        if (c->valid) ok = ok && k == 1 && v == c->value && t.err == 0 && t.pos == n;
+        else ok = k == 1 && v == 0 && t.err == 2u;
+        if (!ok) kern_fail("varint_codec: known encoding or malformed input");
+    }
+    bench_free(t.data);
+}
+
 static void *varint_setup(void) {
     struct varint *s = (struct varint *)bench_alloc(sizeof *s);
     s->n = VI_COUNT;
@@ -110,28 +149,7 @@ static void *varint_setup(void) {
     if (s->buf.len != total || k != s->n || s->buf.pos != total || s->buf.err != 0 ||
         memcmp(s->back, s->vals, s->n * sizeof(uint64_t)) != 0)
         kern_fail("varint_codec: round trip mismatch");
-    /* The decoder rejects truncation and encodings beyond 64 bits. */
-    static const uint8_t bad_trunc[2] = { 0x80u, 0x80u };
-    static const uint8_t bad_long[10] = { 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0x02u };
-    static const uint8_t max_ok[10] = { 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0x01u };
-    struct vbuf t = { (uint8_t *)bench_alloc(VI_MAXLEN), VI_MAXLEN, 0, 0, 0 };
-    memcpy(t.data, bad_trunc, sizeof bad_trunc);
-    t.len = sizeof bad_trunc;
-    uint64_t v0 = vbuf_get(&t);
-    uint32_t e0 = t.err;
-    memcpy(t.data, bad_long, sizeof bad_long);
-    t.len = sizeof bad_long;
-    t.pos = 0;
-    t.err = 0;
-    uint64_t v1 = vbuf_get(&t);
-    uint32_t e1 = t.err;
-    memcpy(t.data, max_ok, sizeof max_ok);
-    t.pos = 0;
-    t.err = 0;
-    uint64_t v2 = vbuf_get(&t);
-    if (v0 != 0 || e0 != 2u || v1 != 0 || e1 != 2u || v2 != ~(uint64_t)0 || t.err != 0 || t.pos != 10)
-        kern_fail("varint_codec: malformed-input handling");
-    bench_free(t.data);
+    varint_selftest();
     return s;
 }
 
@@ -157,14 +175,14 @@ static void varint_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_varint_codec = {
-    "varint_codec", "kern", "LEB128 encode + decode of 5M mixed-size uint64 values, cursors in a struct",
+    "varint_codec", "kern", "LEB128 encode + decode of 2.5M mixed-size uint64 values, cursors in a struct",
     varint_setup, varint_run, varint_teardown,
 };
 
 /* ---- utf8_decode: validating UTF-8 to code point decoding ---------------- */
 
 enum {
-    U8_BYTES = 16 << 20,
+    U8_BYTES = 24 << 20,
     U8_BAD_EVERY = 4096,   /* one invalid sequence per this many code points, on average */
     U8_REPLACEMENT = 0xfffd,
 };
@@ -276,37 +294,37 @@ static size_t utf8_put_invalid(uint8_t *p, struct rng *r) {
     uint8_t c0 = (uint8_t)(0x80u + rng_below(r, 64));
     uint8_t c1 = (uint8_t)(0x80u + rng_below(r, 64));
     switch (rng_below(r, 9)) {
-    case 0:                                               /* stray continuation */
+    case 0u:                                              /* stray continuation */
         p[0] = c0;
         return 1;
-    case 1:                                               /* overlong 2-byte */
+    case 1u:                                              /* overlong 2-byte */
         p[0] = (uint8_t)(0xc0u + rng_below(r, 2));
         p[1] = c0;
         return 2;
-    case 2:                                               /* overlong 3-byte */
+    case 2u:                                              /* overlong 3-byte */
         p[0] = 0xe0u;
         p[1] = (uint8_t)(0x80u + rng_below(r, 32));
         p[2] = c0;
         return 3;
-    case 3:                                               /* surrogate */
+    case 3u:                                              /* surrogate */
         p[0] = 0xedu;
         p[1] = (uint8_t)(0xa0u + rng_below(r, 32));
         p[2] = c0;
         return 3;
-    case 4:                                               /* above U+10FFFF */
+    case 4u:                                              /* above U+10FFFF */
         p[0] = 0xf4u;
         p[1] = (uint8_t)(0x90u + rng_below(r, 48));
         p[2] = c0;
         p[3] = c1;
         return 4;
-    case 5:                                               /* never a valid lead */
+    case 5u:                                              /* never a valid lead */
         p[0] = (uint8_t)(0xf5u + rng_below(r, 11));
         return 1;
-    case 6:                                               /* 3-byte, one continuation missing */
+    case 6u:                                              /* 3-byte, one continuation missing */
         p[0] = (uint8_t)(0xe1u + rng_below(r, 12));
         p[1] = c0;
         return 2;
-    case 7:                                               /* 4-byte, one continuation missing */
+    case 7u:                                              /* 4-byte, one continuation missing */
         p[0] = (uint8_t)(0xf1u + rng_below(r, 3));
         p[1] = c0;
         p[2] = c1;
@@ -350,7 +368,48 @@ static size_t utf8_gen(uint8_t *text, size_t n, uint32_t *want, size_t *nbad, ui
     return k;
 }
 
+/* Validation boundaries: bytes, the input length n, and the expected
+ * sequence length (0: invalid) and code point. */
+struct u8_case { uint8_t b[4]; uint8_t n, len; uint32_t cp; };
+static const struct u8_case u8_cases[] = {
+    { { 0x7f }, 1, 1, 0x7f },
+    { { 0x80 }, 1, 0, 0 },                                /* stray continuation */
+    { { 0xc1, 0xbf }, 2, 0, 0 },                          /* overlong U+7F */
+    { { 0xc2, 0x80 }, 2, 2, 0x80 },
+    { { 0xc2, 0x41 }, 2, 0, 0 },                          /* missing continuation */
+    { { 0xdf, 0xbf }, 2, 2, 0x7ff },
+    { { 0xe0, 0x9f, 0xbf }, 3, 0, 0 },                    /* overlong U+7FF */
+    { { 0xe0, 0xa0, 0x80 }, 3, 3, 0x800 },
+    { { 0xed, 0x9f, 0xbf }, 3, 3, 0xd7ff },
+    { { 0xed, 0xa0, 0x80 }, 3, 0, 0 },                    /* surrogate U+D800 */
+    { { 0xed, 0xbf, 0xbf }, 3, 0, 0 },                    /* surrogate U+DFFF */
+    { { 0xee, 0x80, 0x80 }, 3, 3, 0xe000 },
+    { { 0xef, 0xbf, 0xbf }, 3, 3, 0xffff },
+    { { 0xf0, 0x8f, 0xbf, 0xbf }, 4, 0, 0 },              /* overlong U+FFFF */
+    { { 0xf0, 0x90, 0x80, 0x80 }, 4, 4, 0x10000 },
+    { { 0xf4, 0x8f, 0xbf, 0xbf }, 4, 4, 0x10ffff },
+    { { 0xf4, 0x90, 0x80, 0x80 }, 4, 0, 0 },              /* U+110000 */
+    { { 0xf5, 0x80, 0x80, 0x80 }, 4, 0, 0 },              /* invalid lead */
+    { { 0xc2, 0x80 }, 1, 0, 0 },                          /* truncated by the end of the */
+    { { 0xe1, 0x80, 0x80 }, 2, 0, 0 },                    /* input (n); the bytes past it */
+    { { 0xf1, 0x80, 0x80, 0x80 }, 3, 0, 0 },              /* would complete the sequence */
+};
+
+/* Runs through utf8_decode, so that utf8_next keeps a single caller and is
+ * inlined there. An invalid first sequence decodes to U+FFFD. */
+static void utf8_selftest(void) {
+    for (size_t i = 0; i < sizeof u8_cases / sizeof u8_cases[0]; i++) {
+        const struct u8_case *c = &u8_cases[i];
+        uint32_t out[4];
+        struct utf8_stats st = utf8_decode(c->b, c->n, out);
+        int ok = c->len ? st.count == 1 && st.errors == 0 && out[0] == c->cp
+                        : st.errors != 0 && out[0] == U8_REPLACEMENT;
+        if (!ok) kern_fail("utf8_decode: validation boundary case");
+    }
+}
+
 static void *utf8_setup(void) {
+    utf8_selftest();
     struct utf8 *s = (struct utf8 *)bench_alloc(sizeof *s);
     s->len = U8_BYTES;
     s->text = (uint8_t *)bench_alloc(s->len);
@@ -385,7 +444,7 @@ static void utf8_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_utf8_decode = {
-    "utf8_decode", "kern", "validating UTF-8 decode of 16 MB of mixed 1-4 byte text to code points",
+    "utf8_decode", "kern", "validating UTF-8 decode of 24 MB of mixed 1-4 byte text to code points",
     utf8_setup, utf8_run, utf8_teardown,
 };
 
@@ -470,7 +529,7 @@ static void *murmur_setup(void) {
     size_t total = 0;
     for (size_t i = 0; i < s->nkeys; i++) {
         s->len[i] = (uint8_t)(MM_MINLEN + rng_below(&r, MM_MAXLEN - MM_MINLEN + 1));
-        total += s->len[i];
+        total += (size_t)s->len[i];
     }
     s->keys = (uint8_t *)bench_alloc(total);
     kern_fill_random(s->keys, total, 0x629a292a367cd507u);

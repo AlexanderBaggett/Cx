@@ -20,7 +20,7 @@ def is_ice(n):
     k = n.get('kind')
     if k in ('IntegerLiteral','CharacterLiteral','UnaryExprOrTypeTraitExpr'): return True
     if k == 'DeclRefExpr': return n.get('referencedDecl',{}).get('kind') == 'EnumConstantDecl'
-    if k in ('ParenExpr','ImplicitCastExpr','CStyleCastExpr','UnaryOperator','BinaryOperator','ConditionalOperator'):
+    if k in ('ConstantExpr','ParenExpr','ImplicitCastExpr','CStyleCastExpr','UnaryOperator','BinaryOperator','ConditionalOperator'):
         return all(is_ice(c) for c in n.get('inner', []))
     return False
 def strip_ic(n):
