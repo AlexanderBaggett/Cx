@@ -11,3 +11,8 @@ E09 ABI: struct{double x,y} passed in 4 xmm regs; struct{double x,y,z} (24B) pas
 E10 interposition: clang -fPIC default inlines helper (no dso_local but inlined); -fPIC -fsemantic-interposition: 2 PLT calls, no inlining. gcc 13 -O2 -fPIC: 2 PLT calls (honors interposition by default).
 E11 finite loops: spin(i,n) while(i!=n) i+=2; -std=c99 keeps loop; c11/gnu17 -> function is just retq.
 E12 layout: {char,double,char,double,short}=40 bytes vs sorted 24 bytes.
+E13 exotic types (e13_exotic_types.c, clang 23.1.2 -O2, x86-64 baseline):
+  double _Complex a*b -> inline product + isnan check falling back to call __muldc3 (23 instructions); a/b -> always a (tail) call to __divdc3.
+  long double a*b -> x87: fldt 0x18(%rsp); fldt 0x8(%rsp); fmulp (arguments passed in memory).
+  ldscale loop over long double: NOT vectorized (fldt/fstpt per element); identical double loop: vectorized (VF2, IC2).
+  _BitInt(256) a/b -> 300 instructions.
