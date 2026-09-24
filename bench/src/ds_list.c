@@ -189,7 +189,7 @@ static void lru_insert(struct lru *c, uint32_t key, uint32_t val) {
     lru_index_add(c, n);
 }
 
-static void lru_touch(struct lru *c, struct lru_node *n) {
+static void lru_touch(struct lru *c, [[cx::escapes]] struct lru_node *n) {
     if (c->head != n) {
         lru_unlink(c, n);
         lru_push_front(c, n);
@@ -212,7 +212,7 @@ static void *lru_setup(void) {
         uint32_t key = pick < 86 ? hot[rng_below(&r, LRU_HOT)] : (uint32_t)rng_next(&r);
         uint32_t kind = rng_below(&r, 4);
         s->ops[i].key = key;
-        s->ops[i].val = kind == 0 ? 1 + rng_below(&r, 1u << 30) : 0;
+        s->ops[i].val = kind == 0 ? 1 + rng_below(&r, 1u << 30) : 0u;
     }
     bench_free(hot);
     return s;

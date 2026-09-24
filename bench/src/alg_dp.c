@@ -6,7 +6,7 @@
 
 /* ---- dp_edit_distance: Levenshtein distance, two-row DP ------------------ */
 
-enum { ED_PAIRS = 8, ED_LEN = 2000, ED_MAXLEN = 2 * ED_LEN };
+enum { ED_PAIRS = 10, ED_LEN = 2000, ED_MAXLEN = 2 * ED_LEN };
 
 /* Edit distance between a[0..n) and b[0..m); row0 and row1 hold m + 1 cells. */
 static uint32_t edit_distance(const uint8_t *a, size_t n, const uint8_t *b, size_t m,
@@ -53,7 +53,8 @@ static void *dp_edit_distance_setup(void) {
             uint32_t op = rng_below(&r, 32);
             if (op == 0) continue;                                           /* delete */
             if (op == 1) { b[m] = (uint8_t)('a' + rng_below(&r, 4)); m++; }  /* insert */
-            b[m] = op == 2 ? (uint8_t)('a' + rng_below(&r, 4)) : a[i];       /* substitute or keep */
+            if (op == 2) b[m] = (uint8_t)('a' + rng_below(&r, 4));           /* substitute */
+            else b[m] = a[i];                                                /* keep */
             m++;
         }
         s->len[2 * k] = n;
@@ -83,7 +84,7 @@ static void dp_edit_distance_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_dp_edit_distance = {
-    "dp_edit_distance", "alg", "Levenshtein distance (two-row DP) of 8 pairs of ~2000-char strings",
+    "dp_edit_distance", "alg", "Levenshtein distance (two-row DP) of 10 pairs of ~2000-char strings",
     dp_edit_distance_setup, dp_edit_distance_run, dp_edit_distance_teardown,
 };
 
@@ -143,7 +144,7 @@ extern const struct bench bench_dp_knapsack = {
 
 /* ---- backtrack_nqueens: count N-queens solutions with bitmasks ------------ */
 
-enum { NQ_N = 13 };
+enum { NQ_MIN = 12, NQ_MAX = 13 };
 
 /* Solutions for the remaining rows; cols/left/right are the attacked columns
  * of the next row, all within the mask `all`. */
@@ -159,18 +160,23 @@ static uint64_t nqueens(uint32_t all, uint32_t cols, uint32_t left, uint32_t rig
     return count;
 }
 
-struct backtrack_nqueens { uint32_t n; };
+struct backtrack_nqueens { uint32_t nmin, nmax; };
 
 static void *backtrack_nqueens_setup(void) {
     struct backtrack_nqueens *s = (struct backtrack_nqueens *)bench_alloc(sizeof *s);
-    s->n = NQ_N;
+    s->nmin = NQ_MIN;
+    s->nmax = NQ_MAX;
     return s;
 }
 
 static uint64_t backtrack_nqueens_run(void *state) {
     const struct backtrack_nqueens *s = (const struct backtrack_nqueens *)state;
-    uint32_t all = (1u << s->n) - 1u;
-    return mix(mix(0, s->n), nqueens(all, 0, 0, 0));
+    uint64_t h = 0;
+    for (uint32_t n = s->nmin; n <= s->nmax; n++) {
+        uint32_t all = (1u << n) - 1u;
+        h = mix(mix(h, n), nqueens(all, 0, 0, 0));
+    }
+    return h;
 }
 
 static void backtrack_nqueens_teardown([[cx::escapes]] void *state) {
@@ -178,6 +184,6 @@ static void backtrack_nqueens_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_backtrack_nqueens = {
-    "backtrack_nqueens", "alg", "count 13-queens solutions by bitmask backtracking",
+    "backtrack_nqueens", "alg", "count 12- and 13-queens solutions by bitmask backtracking",
     backtrack_nqueens_setup, backtrack_nqueens_run, backtrack_nqueens_teardown,
 };

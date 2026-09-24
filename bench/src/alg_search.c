@@ -3,7 +3,7 @@
 
 /* ---- search_binary: lower_bound queries on a sorted array ---------------- */
 
-enum { BSEARCH_N = 1 << 20, BSEARCH_Q = 1 << 20 };
+enum { BSEARCH_N = 1 << 20, BSEARCH_Q = 1 << 18 };
 
 /* Index of the first element of a[0..n) that is >= key (n if none). */
 static size_t lower_bound_u32(const uint32_t *a, size_t n, uint32_t key) {
@@ -60,13 +60,13 @@ static void search_binary_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_search_binary = {
-    "search_binary", "alg", "1M lower_bound queries (hits and misses) on 1M sorted uint32",
+    "search_binary", "alg", "256K lower_bound queries (hits and misses) on 1M sorted uint32",
     search_binary_setup, search_binary_run, search_binary_teardown,
 };
 
 /* ---- search_substring: Knuth-Morris-Pratt over a large text --------------- */
 
-enum { KMP_TEXT = 1 << 21, KMP_PATS = 16, KMP_MINLEN = 6, KMP_MAXLEN = 24 };
+enum { KMP_TEXT = 1 << 20, KMP_PATS = 16, KMP_MINLEN = 6, KMP_MAXLEN = 24 };
 
 /* fail[i] = length of the longest proper border of p[0..i]. */
 static void kmp_build(const uint8_t *p, size_t m, size_t *fail) {
@@ -153,6 +153,6 @@ static void search_substring_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_search_substring = {
-    "search_substring", "alg", "KMP search of 16 patterns in a 2 MB 4-letter text",
+    "search_substring", "alg", "KMP search of 16 patterns in a 1 MB 4-letter text",
     search_substring_setup, search_substring_run, search_substring_teardown,
 };

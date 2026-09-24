@@ -189,7 +189,7 @@ static uint64_t sb_run(void *state) {
         }
         /* FNV-1a 32 over the result, in 64-bit arithmetic with masking */
         uint64_t f = 2166136261u;
-        for (size_t i = 0; i < b.len; i++) f = ((f ^ b.data[i]) * 16777619u) & 0xffffffffu;
+        for (size_t i = 0; i < b.len; i++) f = ((f ^ (uint64_t)b.data[i]) * 16777619u) & 0xffffffffu;
         h = mix(mix(h, b.len), f);
         bench_free(b.data);
     }

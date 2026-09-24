@@ -41,7 +41,7 @@ static void i32_insertion_sort(int32_t *a, size_t n) {
 
 /* ---- sort_quick: quicksort, median-of-3, insertion sort below a cutoff ---- */
 
-enum { QUICK_N = 1 << 20, QUICK_CUTOFF = 16 };
+enum { QUICK_N = 800000, QUICK_CUTOFF = 16 };
 
 static void i32_quick_sort(int32_t *a, size_t n) {
     while (n > QUICK_CUTOFF) {
@@ -102,7 +102,7 @@ static void sort_quick_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_sort_quick = {
-    "sort_quick", "alg", "quicksort (median-of-3, insertion sort below 16) of 1M int32",
+    "sort_quick", "alg", "quicksort (median-of-3, insertion sort below 16) of 800K int32",
     sort_quick_setup, sort_quick_run, sort_quick_teardown,
 };
 

@@ -77,7 +77,7 @@ static void csr_free(struct csr *g) {
 
 /* ---- graph_bfs: breadth-first search ------------------------------------ */
 
-enum { BFS_V = 1 << 20, BFS_DMIN = 2, BFS_DMAX = 14, BFS_SOURCES = 2 };
+enum { BFS_V = 1 << 18, BFS_DMIN = 2, BFS_DMAX = 14, BFS_SOURCES = 3 };
 
 /* BFS from src; dist[v] = hop count or UNSEEN. Returns the number of vertices
  * reached. */
@@ -144,13 +144,13 @@ static void graph_bfs_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_graph_bfs = {
-    "graph_bfs", "alg", "BFS from 2 sources over a random directed CSR graph (1M vertices, 8M edges)",
+    "graph_bfs", "alg", "BFS from 3 sources over a random directed CSR graph (256K vertices, 2M edges)",
     graph_bfs_setup, graph_bfs_run, graph_bfs_teardown,
 };
 
 /* ---- graph_dfs: iterative DFS, connected components ---------------------- */
 
-enum { DFS_V = 1 << 21, DFS_E = (1 << 21) + (1 << 20) };
+enum { DFS_V = 3 << 17, DFS_E = (3 << 17) + (3 << 16) };
 
 struct dfs_result { uint32_t ncomp; uint32_t largest; uint64_t h; };
 
@@ -222,13 +222,13 @@ static void graph_dfs_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_graph_dfs = {
-    "graph_dfs", "alg", "iterative DFS connected components of a random undirected graph (2M vertices, 3M edges)",
+    "graph_dfs", "alg", "iterative DFS connected components of a random undirected graph (384K vertices, 576K edges)",
     graph_dfs_setup, graph_dfs_run, graph_dfs_teardown,
 };
 
 /* ---- graph_dijkstra: shortest paths with an indexed binary heap ---------- */
 
-enum { DIJ_V = 1 << 18, DIJ_DMIN = 2, DIJ_DMAX = 14, DIJ_WMAX = 1000 };
+enum { DIJ_V = 1 << 17, DIJ_DMIN = 2, DIJ_DMAX = 14, DIJ_WMAX = 1000 };
 
 /* Min-heap of vertices keyed by dist[]; where[v] is v's slot or UNSEEN. */
 static void heap_up(uint32_t *heap, uint32_t *where, const uint32_t *dist, size_t i) {
@@ -345,6 +345,6 @@ static void graph_dijkstra_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_graph_dijkstra = {
-    "graph_dijkstra", "alg", "Dijkstra with an indexed binary heap on a weighted random graph (256K vertices, 2M edges)",
+    "graph_dijkstra", "alg", "Dijkstra with an indexed binary heap on a weighted random graph (128K vertices, 1M edges)",
     graph_dijkstra_setup, graph_dijkstra_run, graph_dijkstra_teardown,
 };

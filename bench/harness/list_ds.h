@@ -1,1 +1,13 @@
 /* ds benchmarks: B(name) per line */
+B(vector_push)
+B(slist)
+B(dlist_lru)
+B(hash_int)
+B(hash_str)
+B(bst_avl)
+B(heap_pq)
+B(ring_queue)
+B(bitset_ops)
+B(union_find)
+B(trie_words)
+B(string_builder)
