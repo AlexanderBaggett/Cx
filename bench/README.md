@@ -42,7 +42,7 @@ cmake -G Ninja -S llvm -B ../cx-build -DCMAKE_BUILD_TYPE=Release \
 ninja -C ../cx-build clang
 ```
 
-Override the paths with `make CC_C=… CC_CX=…`. Both compilers get the same flags: `-std=c23 -O2 -march=x86-64` (baseline ISA).
+Override the paths with `make CC_C=… CC_CX=…`. Both compilers get the same flags: `-std=c23 -O2 -march=x86-64 -ffp-contract=off` (baseline ISA). With `-ffp-contract=off`, floating-point checksums cannot depend on whether an expression was constant-folded with fused rounding.
 
 ## Running
 
@@ -67,7 +67,7 @@ Keep the machine otherwise idle while running. On a shared VM, single rounds com
 
 ## Source rules (the C23 ∩ Cx subset)
 
-Each benchmark is written once and must be valid in both languages. The build enforces most rules: `make check` runs the lint, a `-Werror -Wconversion -Wsign-conversion …` build, and ASan + UBSan with `unsigned-integer-overflow` and `implicit-conversion`.
+Each benchmark is written once and must be valid in both languages. The build enforces most rules: `make check` runs the lint, a `-Werror -Wconversion -Wsign-conversion …` build, and ASan + UBSan with `unsigned-integer-overflow` and `implicit-conversion`. It then checks that the sanitizer build (`-O1`) and the `-O2` build produce identical checksums (`tools/compare_checksums.py`).
 
 1. **No removed keywords or features:** no `restrict`, `volatile`, `_Atomic`, `register`, `auto`, `long double`, `_Complex`, `_BitInt`, VLAs, `alloca`, `setjmp`/`longjmp`, variadic definitions, `goto`, or union punning (spec §3, §19).
 2. **No integer overflow**, signed *or unsigned*, because Cx treats unsigned wraparound as a violation (spec §7.1). Values are bounded, or computed in 64-bit with explicit masks. The PRNG is xorshift (shifts and xors only).

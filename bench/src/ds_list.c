@@ -4,7 +4,7 @@
 
 /* ---- slist: push-front, traverse, remove every k-th node, free ------------ */
 
-enum { SL_N = 1 << 18, SL_ROUNDS = 6 };
+enum { SL_N = 1 << 14, SL_ROUNDS = 48 };
 
 struct sl_node { [[cx::owned]] struct sl_node *next; uint32_t val; };
 struct slist { [[cx::owned]] struct sl_node *head; size_t len; };
@@ -102,10 +102,11 @@ extern const struct bench bench_slist = {
 
 enum {
     LRU_CAP = 1 << 15,          /* cached entries */
-    LRU_SLOTS = 1 << 16,        /* index slots (load <= 0.5) */
     LRU_SLOT_BITS = 16,
-    LRU_HOT = 28000,            /* hot keys; most requests hit these */
-    LRU_OPS = 1 << 21,
+    LRU_SLOTS = 1 << LRU_SLOT_BITS,     /* index slots (load <= 0.5) */
+    LRU_HOT = 26000,            /* hot keys ... */
+    LRU_HOT_PCT = 89,           /* ... get this share of the requests: ~81% hits */
+    LRU_OPS = 3 << 19,
 };
 
 /* List links are shared (not owned): every node is reachable from its
@@ -209,7 +210,7 @@ static void *lru_setup(void) {
     for (size_t i = 0; i < LRU_HOT; i++) hot[i] = (uint32_t)rng_next(&r);
     for (size_t i = 0; i < LRU_OPS; i++) {
         uint32_t pick = rng_below(&r, 100);
-        uint32_t key = pick < 86 ? hot[rng_below(&r, LRU_HOT)] : (uint32_t)rng_next(&r);
+        uint32_t key = pick < LRU_HOT_PCT ? hot[rng_below(&r, LRU_HOT)] : (uint32_t)rng_next(&r);
         uint32_t kind = rng_below(&r, 4);
         s->ops[i].key = key;
         s->ops[i].val = kind == 0 ? 1 + rng_below(&r, 1u << 30) : 0u;
@@ -239,13 +240,13 @@ static uint64_t lru_run(void *state) {
     }
     h = mix(mix(mix(h, hits), sum), c.count);
     /* walk from most to least recently used, then free */
-    struct lru_node *n = c.head;
+    struct lru_node *p = c.head;
     size_t pos = 0;
-    while (n) {
-        struct lru_node *next = n->next;
-        if ((pos++ & 255u) == 0) h = mix(h, n->key);
-        bench_free(n);
-        n = next;
+    while (p) {
+        struct lru_node *next = p->next;
+        if ((pos++ & 255u) == 0) h = mix(h, p->key);
+        bench_free(p);
+        p = next;
     }
     bench_free(c.slots);
     return h;

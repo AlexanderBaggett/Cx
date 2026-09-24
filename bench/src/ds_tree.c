@@ -6,7 +6,7 @@
 
 /* ---- bst_avl: AVL tree inserts, hit/miss lookups, in-order traversal ------ */
 
-enum { AVL_N = 1 << 17, AVL_LOOKUPS = 1 << 18 };
+enum { AVL_N = 1 << 16, AVL_LOOKUPS = 1 << 17 };
 
 /* Each node owns its subtrees. */
 struct avl {
@@ -168,8 +168,8 @@ extern const struct bench bench_bst_avl = {
 /* ---- trie_words: 26-way trie over generated lowercase words --------------- */
 
 enum {
-    TRIE_WORDS = 1 << 17,       /* words inserted */
-    TRIE_LOOKUPS = 1 << 18,     /* words looked up */
+    TRIE_WORDS = 3 << 15,       /* words inserted */
+    TRIE_LOOKUPS = 3 << 16,     /* words looked up */
     TRIE_SYL = 40,              /* syllables the words are built from */
     TRIE_WORD_MAX = 16,
     TRIE_TOTAL = TRIE_WORDS + TRIE_WORDS / 2,
@@ -267,6 +267,7 @@ static uint64_t trie_run(void *state) {
         uint32_t v = trie_find(&t, &s->pool[(size_t)k * TRIE_WORD_MAX], s->len[k]);
         found += v != 0 ? 1u : 0u;
         sum += v;
+        if ((i & 255u) == 0) h = mix(h, sum);
     }
     h = mix(mix(h, found), sum);
     bench_free(t.nodes);

@@ -14,7 +14,7 @@ static void fill_random(uint8_t *p, size_t n, uint64_t seed) {
 
 /* ---- crc32: table-driven CRC-32 (IEEE 802.3, reflected) ------------------- */
 
-enum { CRC_BYTES = 16 << 20 };
+enum { CRC_BYTES = 20 << 20 };
 
 struct crc {
     uint32_t table[256];
@@ -51,17 +51,17 @@ static void crc_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_crc32 = {
-    "crc32", "kern", "table-driven byte-at-a-time CRC-32 over 16 MB",
+    "crc32", "kern", "table-driven byte-at-a-time CRC-32 over 20 MB",
     crc_setup, crc_run, crc_teardown,
 };
 
 /* ---- base64: encode then decode random bytes, verify the round trip ------- */
 
-enum { B64_BYTES = 12 << 20, B64_TEXT = (B64_BYTES + 2) / 3 * 4 };
+enum { B64_BYTES = 16 << 20, B64_TEXT = (B64_BYTES + 2) / 3 * 4 };
 
 struct b64 {
-    uint8_t enc[64];     /* 6-bit value -> character */
-    uint8_t dec[256];    /* character -> 6-bit value, 0xff if invalid */
+    [[cx::owned]] uint8_t *enc;    /* 6-bit value -> character (64 entries) */
+    [[cx::owned]] uint8_t *dec;    /* character -> 6-bit value, 0xff if invalid (256) */
     [[cx::owned]] uint8_t *src;
     [[cx::owned]] uint8_t *text;
     [[cx::owned]] uint8_t *back;
@@ -69,6 +69,8 @@ struct b64 {
 
 static void *b64_setup(void) {
     struct b64 *s = (struct b64 *)bench_alloc(sizeof *s);
+    s->enc = (uint8_t *)bench_alloc(64);
+    s->dec = (uint8_t *)bench_alloc(256);
     for (int i = 0; i < 26; i++) {
         s->enc[i] = (uint8_t)('A' + i);
         s->enc[26 + i] = (uint8_t)('a' + i);
@@ -154,6 +156,8 @@ static uint64_t b64_run(void *state) {
 
 static void b64_teardown([[cx::escapes]] void *state) {
     struct b64 *s = (struct b64 *)state;
+    bench_free(s->enc);
+    bench_free(s->dec);
     bench_free(s->src);
     bench_free(s->text);
     bench_free(s->back);
@@ -161,13 +165,13 @@ static void b64_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_base64 = {
-    "base64", "kern", "base64 encode + decode of 12 MB random bytes, round-trip check",
+    "base64", "kern", "base64 encode + decode of 16 MB random bytes, round-trip check",
     b64_setup, b64_run, b64_teardown,
 };
 
 /* ---- sha256: SHA-256 digest of a buffer ----------------------------------- */
 
-enum { SHA_BYTES = 8 << 20 };
+enum { SHA_BYTES = 10 << 20 };
 
 static const uint32_t sha_k[64] = {
     0x428a2f98u, 0x71374491u, 0xb5c0fbcfu, 0xe9b5dba5u, 0x3956c25bu, 0x59f111f1u, 0x923f82a4u, 0xab1c5ed5u,
@@ -268,7 +272,7 @@ static void sha_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_sha256 = {
-    "sha256", "kern", "SHA-256 of an 8 MB buffer (32-bit adds done in 64 bits and masked)",
+    "sha256", "kern", "SHA-256 of a 10 MB buffer (32-bit adds done in 64 bits and masked)",
     sha_setup, sha_run, sha_teardown,
 };
 

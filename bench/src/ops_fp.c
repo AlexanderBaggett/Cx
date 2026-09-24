@@ -6,7 +6,7 @@
 
 /* ---- fp_poly: Horner evaluation of a degree-12 polynomial ---------------- */
 
-enum { POLY_N = 1 << 14, POLY_PASSES = 400, POLY_DEG = 12 };
+enum { POLY_N = 1 << 14, POLY_PASSES = 800, POLY_DEG = 12 };
 
 struct poly { double *x; double *acc; double *c; };
 
@@ -35,7 +35,7 @@ static uint64_t poly_run(void *state) {
     const struct poly *s = (const struct poly *)state;
     for (size_t i = 0; i < POLY_N; i++) s->acc[i] = 0.0;
     for (int pass = 0; pass < POLY_PASSES; pass++)
-        poly_kernel(s->acc, s->x, s->c, POLY_N, 0.5 + 0.5 * (double)pass / POLY_PASSES);
+        poly_kernel(s->acc, s->x, s->c, POLY_N, 0.5 + 0.5 * (double)pass / (double)POLY_PASSES);
     double sum = 0.0;
     uint64_t h = 0;
     for (size_t i = 0; i < POLY_N; i++) {
@@ -60,7 +60,7 @@ extern const struct bench bench_fp_poly = {
 
 /* ---- fp_divsqrt: double division and square root ------------------------- */
 
-enum { DS_N = 1 << 14, DS_PASSES = 200 };
+enum { DS_N = 1 << 14, DS_PASSES = 800 };
 
 struct divsqrt { double *a; double *b; double *acc; };
 
@@ -89,7 +89,7 @@ static uint64_t divsqrt_run(void *state) {
     const struct divsqrt *s = (const struct divsqrt *)state;
     for (size_t i = 0; i < DS_N; i++) s->acc[i] = 0.0;
     for (int pass = 0; pass < DS_PASSES; pass++)
-        divsqrt_kernel(s->acc, s->a, s->b, DS_N, 0.25 + (double)pass / DS_PASSES);
+        divsqrt_kernel(s->acc, s->a, s->b, DS_N, 0.25 + (double)pass / (double)DS_PASSES);
     double sum = 0.0;
     uint64_t h = 0;
     for (size_t i = 0; i < DS_N; i++) {
@@ -114,7 +114,7 @@ extern const struct bench bench_fp_divsqrt = {
 
 /* ---- fp_libm: exp, log, sin, cos and pow -------------------------------- */
 
-enum { LIBM_N = 1 << 12, LIBM_PASSES = 40 };
+enum { LIBM_N = 1 << 12, LIBM_PASSES = 240 };
 
 struct libm { double *x; };
 
@@ -130,7 +130,7 @@ static uint64_t libm_run(void *state) {
     const struct libm *s = (const struct libm *)state;
     uint64_t h = 0;
     for (int pass = 0; pass < LIBM_PASSES; pass++) {
-        double t = 0.5 + (double)pass / LIBM_PASSES;   /* t in [0.5, 1.5) */
+        double t = 0.5 + (double)pass / (double)LIBM_PASSES;   /* t in [0.5, 1.5) */
         double e = 0.0, l = 0.0, sc = 0.0, p = 0.0;
         for (size_t i = 0; i < LIBM_N; i++) {
             double x = s->x[i];                         /* x in [0.1, 2.1) */

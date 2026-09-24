@@ -28,9 +28,9 @@ static uint64_t fletcher_bytes(const unsigned char *p, size_t n) {
 
 enum {
     MC_SRC_SIZE = 4 << 20,
-    MC_SMALL_N = 1 << 14, MC_SMALL_REPS = 64, MC_SMALL_SRC = 1 << 18, MC_SMALL_REGION = 1 << 16,
-    MC_MED_N = 1 << 10, MC_MED_REPS = 64, MC_MED_SRC = 1 << 20, MC_MED_REGION = 1 << 18, MC_MED_SIZE = 4096,
-    MC_BIG_N = 96, MC_BIG_SIZE = 1 << 20,
+    MC_SMALL_N = 1 << 14, MC_SMALL_REPS = 128, MC_SMALL_SRC = 1 << 18, MC_SMALL_REGION = 1 << 16,
+    MC_MED_N = 1 << 10, MC_MED_REPS = 128, MC_MED_SRC = 1 << 20, MC_MED_REGION = 1 << 18, MC_MED_SIZE = 4096,
+    MC_BIG_N = 192, MC_BIG_SIZE = 1 << 20,
     MC_DST_MED = MC_BIG_SIZE,
     MC_DST_SMALL = MC_DST_MED + MC_MED_REGION + MC_MED_SIZE,
     MC_DST_SIZE = MC_DST_SMALL + MC_SMALL_REGION + 256,
@@ -111,7 +111,7 @@ extern const struct bench bench_mem_copy = {
 
 /* ---- mem_set_cmp: memset then memcmp of the same ranges ------------------ */
 
-enum { MSC_BUF = 1 << 20, MSC_OPS = 1 << 14 };
+enum { MSC_BUF = 1 << 20, MSC_OPS = 1 << 15 };
 
 struct msc {
     unsigned char *x; unsigned char *y;
@@ -178,7 +178,7 @@ extern const struct bench bench_mem_set_cmp = {
 
 /* ---- mem_stream: STREAM triad a[i] = b[i] + s*c[i] ----------------------- */
 
-enum { STREAM_N = 1 << 21, STREAM_REPS = 8, STREAM_SAMPLE = 4099 };   /* 16 MB per array */
+enum { STREAM_N = 1 << 21, STREAM_REPS = 10, STREAM_SAMPLE = 4099 };   /* 16 MB per array */
 
 struct stream { double *a; double *b; double *c; };
 
@@ -227,7 +227,7 @@ extern const struct bench bench_mem_stream = {
 
 /* ---- mem_chase: pointer chasing through a random single-cycle permutation - */
 
-enum { CHASE_CELLS = 1 << 21, CHASE_STEPS = 1 << 19 };   /* 16-byte cells: 32 MB */
+enum { CHASE_CELLS = 1 << 21, CHASE_STEPS = 3 << 17 };   /* 16-byte cells: 32 MB */
 
 struct chase_cell { struct chase_cell *next; uint64_t val; };
 
@@ -278,7 +278,7 @@ extern const struct bench bench_mem_chase = {
 
 /* ---- mem_strided: column-order traversal of a row-major matrix ----------- */
 
-enum { STRIDED_DIM = 2048, STRIDED_PASSES = 2 };   /* 2048 x 2048 doubles: 32 MB */
+enum { STRIDED_DIM = 2048, STRIDED_PASSES = 1 };   /* 2048 x 2048 doubles: 32 MB */
 
 struct strided { double *m; double *col; };
 
@@ -323,7 +323,7 @@ extern const struct bench bench_mem_strided = {
 
 /* ---- alloc_churn: malloc/free with a sliding window of live blocks ------- */
 
-enum { AC_OPS = 1 << 20, AC_WINDOW = 1024 };
+enum { AC_OPS = 3 << 18, AC_WINDOW = 1024 };
 
 struct churn {
     uint16_t *size; uint16_t *victim;

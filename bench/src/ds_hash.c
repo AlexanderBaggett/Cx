@@ -6,7 +6,7 @@
 
 /* ---- hash_int: linear probing uint32 -> uint32, backward-shift delete ----- */
 
-enum { HI_N = 1 << 19, HI_MIN_BITS = 4 };
+enum { HI_N = 3 << 17, HI_MIN_BITS = 4 };
 
 /* key 0 marks an empty slot; stored keys are never 0 */
 struct hi_slot { uint32_t key; uint32_t val; };
@@ -149,7 +149,7 @@ extern const struct bench bench_hash_int = {
 
 /* ---- hash_str: separate chaining with string keys, FNV-1a ----------------- */
 
-enum { HS_N = 1 << 17, HS_LOOKUPS = 1 << 18, HS_KEY_MAX = 24 };
+enum { HS_N = 3 << 15, HS_LOOKUPS = 3 << 16, HS_KEY_MAX = 24 };
 
 struct hs_entry {
     [[cx::owned]] struct hs_entry *next;
@@ -273,6 +273,7 @@ static uint64_t hs_run(void *state) {
         uint32_t v = hs_get(&m, &s->pool[s->off[k]], s->len[k]);
         found += v != 0 ? 1u : 0u;
         sum += v;
+        if ((i & 255u) == 0) h = mix(h, sum);
     }
     h = mix(mix(h, found), sum);
     for (size_t i = 0; i <= m.mask; i++) {

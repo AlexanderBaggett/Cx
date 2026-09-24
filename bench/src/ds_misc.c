@@ -6,7 +6,7 @@
 
 /* ---- heap_pq: binary min-heap driving a discrete-event simulation --------- */
 
-enum { HEAP_INIT = 1 << 16, HEAP_EVENTS = 1 << 21, HEAP_STREAM = 1 << 16 };
+enum { HEAP_INIT = 1 << 16, HEAP_EVENTS = 3 << 17, HEAP_STREAM = 1 << 16 };
 
 struct hp_event { uint64_t time; uint32_t id; uint32_t kind; };
 struct hp_heap { [[cx::owned]] struct hp_event *a; size_t len; size_t cap; };
@@ -182,7 +182,7 @@ extern const struct bench bench_ring_queue = {
 
 /* ---- bitset_ops: set/clear/test, word-wise and/or/xor, popcount ----------- */
 
-enum { BS_BITS = 1 << 20, BS_WORDS = BS_BITS / 64, BS_OPS = 1 << 18, BS_PASSES = 8 };
+enum { BS_BITS = 1 << 20, BS_WORDS = BS_BITS / 64, BS_OPS = 1 << 18, BS_PASSES = 20 };
 
 struct bitset { [[cx::owned]] uint64_t *w; size_t nwords; };
 

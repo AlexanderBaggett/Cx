@@ -34,12 +34,14 @@ static const double nb_init[NB_BODIES][7] = {
 };
 
 struct nbody {
-    struct body start[NB_BODIES];
-    struct body work[NB_BODIES];
+    [[cx::owned]] struct body *start;   /* initial state, built in setup */
+    [[cx::owned]] struct body *work;    /* simulated copy */
 };
 
 static void *nbody_setup(void) {
     struct nbody *s = (struct nbody *)bench_alloc(sizeof *s);
+    s->start = (struct body *)bench_alloc(NB_BODIES * sizeof(struct body));
+    s->work = (struct body *)bench_alloc(NB_BODIES * sizeof(struct body));
     for (size_t i = 0; i < NB_BODIES; i++) {
         struct body *b = &s->start[i];
         b->x = nb_init[i][0];
@@ -50,12 +52,18 @@ static void *nbody_setup(void) {
         b->vz = nb_init[i][5] * nb_days_per_year;
         b->mass = nb_init[i][6] * nb_solar_mass;
     }
-    /* offset momentum so the system's centre of mass is at rest */
+    /* Offset momentum so the system's centre of mass is at rest. The products
+     * are separate statements so they are never contracted: this loop runs on
+     * compile-time constants, and a constant-folded fused multiply-add would
+     * round differently from the unfused run-time code. */
     double px = 0.0, py = 0.0, pz = 0.0;
     for (size_t i = 0; i < NB_BODIES; i++) {
-        px += s->start[i].vx * s->start[i].mass;
-        py += s->start[i].vy * s->start[i].mass;
-        pz += s->start[i].vz * s->start[i].mass;
+        double mx = s->start[i].vx * s->start[i].mass;
+        double my = s->start[i].vy * s->start[i].mass;
+        double mz = s->start[i].vz * s->start[i].mass;
+        px += mx;
+        py += my;
+        pz += mz;
     }
     s->start[0].vx = -px / nb_solar_mass;
     s->start[0].vy = -py / nb_solar_mass;
@@ -98,8 +106,8 @@ static void nbody_advance(struct body *b, size_t n, double dt) {
 }
 
 static uint64_t nbody_run(void *state) {
-    struct nbody *s = (struct nbody *)state;
-    memcpy(s->work, s->start, sizeof s->work);
+    const struct nbody *s = (const struct nbody *)state;
+    memcpy(s->work, s->start, NB_BODIES * sizeof(struct body));
     uint64_t h = mix_double(0, nbody_energy(s->work, NB_BODIES));
     for (int step = 0; step < NB_STEPS; step++) nbody_advance(s->work, NB_BODIES, nb_dt);
     h = mix_double(h, nbody_energy(s->work, NB_BODIES));
@@ -109,7 +117,10 @@ static uint64_t nbody_run(void *state) {
 }
 
 static void nbody_teardown([[cx::escapes]] void *state) {
-    bench_free(state);
+    struct nbody *s = (struct nbody *)state;
+    bench_free(s->start);
+    bench_free(s->work);
+    bench_free(s);
 }
 
 extern const struct bench bench_nbody = {
@@ -176,7 +187,7 @@ extern const struct bench bench_mandelbrot = {
 
 /* ---- sieve_primes: sieve of Eratosthenes over an odd-only bit array ------- */
 
-enum { SV_LIMIT = 50000000, SV_BITS = SV_LIMIT / 2, SV_WORDS = (SV_BITS + 63) / 64 };
+enum { SV_LIMIT = 40000000, SV_BITS = SV_LIMIT / 2, SV_WORDS = (SV_BITS + 63) / 64 };
 
 /* Bit k of the array stands for the odd number 2k+1 (SV_LIMIT is even). */
 struct sieve { [[cx::owned]] uint64_t *bits; };
@@ -203,7 +214,7 @@ static void sieve_mark(uint64_t *bits, size_t nbits) {
 static uint64_t sieve_run(void *state) {
     const struct sieve *s = (const struct sieve *)state;
     sieve_mark(s->bits, SV_BITS);
-    uint64_t count = 1, sum = 2;       /* the prime 2; sum of primes < 5e7 is < 2^48 */
+    uint64_t count = 1, sum = 2;       /* the prime 2; sum of primes < 4e7 is < 2^48 */
     for (size_t i = 0; i < SV_WORDS; i++) {
         uint64_t w = s->bits[i];
         count += stdc_count_ones(w);
@@ -222,6 +233,6 @@ static void sieve_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_sieve_primes = {
-    "sieve_primes", "kern", "sieve of Eratosthenes up to 50M (odd-only bit array), count primes",
+    "sieve_primes", "kern", "sieve of Eratosthenes up to 40M (odd-only bit array), count primes",
     sieve_setup, sieve_run, sieve_teardown,
 };

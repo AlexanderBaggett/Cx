@@ -5,7 +5,7 @@
 #include <string.h>
 
 /* realloc that aborts on failure. */
-static void *vec_realloc([[cx::escapes, cx::nullable]] void *p, size_t bytes) {
+static void *xrealloc([[cx::escapes, cx::nullable]] void *p, size_t bytes) {
     void *q = realloc(p, bytes);
     if (!q) abort();
     return q;
@@ -13,14 +13,14 @@ static void *vec_realloc([[cx::escapes, cx::nullable]] void *p, size_t bytes) {
 
 /* ---- vector_push: push with geometric growth, iterate/sum, pop all -------- */
 
-enum { VEC_N = 1 << 20, VEC_ROUNDS = 12, VEC_STEP = 40961 };
+enum { VEC_N = 1 << 20, VEC_ROUNDS = 24, VEC_STEP = 40961 };
 
 struct vec { [[cx::owned]] uint32_t *data; size_t len; size_t cap; };
 
 static void vec_push(struct vec *v, uint32_t x) {
     if (v->len == v->cap) {
         size_t cap = v->cap ? v->cap * 2 : 8;
-        v->data = (uint32_t *)vec_realloc(v->data, cap * sizeof *v->data);
+        v->data = (uint32_t *)xrealloc(v->data, cap * sizeof *v->data);
         v->cap = cap;
     }
     v->data[v->len++] = x;
@@ -47,10 +47,10 @@ static uint64_t vec_run(void *state) {
     uint64_t h = 0;
     for (size_t round = 0; round < VEC_ROUNDS; round++) {
         struct vec v = { NULL, 0, 0 };
-        size_t n = VEC_N - round * VEC_STEP;
+        size_t n = VEC_N - (round & 7u) * VEC_STEP;
         uint32_t salt = (uint32_t)round;
         for (size_t i = 0; i < n; i++) vec_push(&v, s->in[i] ^ salt);
-        /* iterate: sum and a strided read (values < 2^24, so no overflow) */
+        /* iterate: sum and count odd values (values < 2^24: no overflow) */
         uint64_t sum = 0, odd = 0;
         for (size_t i = 0; i < v.len; i++) {
             sum += v.data[i];
@@ -79,7 +79,7 @@ extern const struct bench bench_vector_push = {
 
 /* ---- string_builder: appends of short strings and formatted numbers ------- */
 
-enum { SB_RECORDS = 1 << 18, SB_ROUNDS = 4, SB_WORDS = 64, SB_WORD_MAX = 12 };
+enum { SB_RECORDS = 1 << 17, SB_ROUNDS = 4, SB_WORDS = 64, SB_WORD_MAX = 12 };
 
 struct sb { [[cx::owned]] uint8_t *data; size_t len; size_t cap; };
 
@@ -88,7 +88,7 @@ static void sb_reserve(struct sb *b, size_t extra) {
     if (need <= b->cap) return;
     size_t cap = b->cap ? b->cap : 64;
     while (cap < need) cap *= 2;
-    b->data = (uint8_t *)vec_realloc(b->data, cap);
+    b->data = (uint8_t *)xrealloc(b->data, cap);
     b->cap = cap;
 }
 

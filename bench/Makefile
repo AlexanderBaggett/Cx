@@ -18,7 +18,10 @@ CC_CX    ?= $(CX_BUILD)/bin/clang
 CX_FLAGS ?=
 
 OPT      ?= -O2
-BASEFLAGS = -std=c23 $(OPT) -march=x86-64 -Iharness \
+# -ffp-contract=off: no fused multiply-add contraction, so floating-point
+# results (and checksums) cannot depend on whether a compiler happened to
+# constant-fold an expression with fused rounding.
+BASEFLAGS = -std=c23 $(OPT) -march=x86-64 -ffp-contract=off -Iharness \
             -Wall -Wextra -Wno-unknown-attributes -Wno-extern-initializer
 LDLIBS    = -lm
 
@@ -84,10 +87,12 @@ strict: | $(BUILD)/strict
 	@for f in $(SRCS); do \
 	  $(CC_C) $(BASEFLAGS) $(STRICT) -fsyntax-only $$f || exit 1; \
 	done; echo "strict: OK ($(words $(SRCS)) files)"
-sanitize: | $(BUILD)/san
-	$(CC_C) -std=c23 -Iharness -Wno-unknown-attributes -Wno-extern-initializer $(if $(ONLY),-DBENCH_ONLY_$(ONLY),) $(SANFLAGS) $(SRCS) -o $(BUILD)/san/bench $(LDLIBS)
+sanitize: $(BUILD)/c/bench | $(BUILD)/san
+	$(CC_C) -std=c23 -ffp-contract=off -Iharness -Wno-unknown-attributes -Wno-extern-initializer $(if $(ONLY),-DBENCH_ONLY_$(ONLY),) $(SANFLAGS) $(SRCS) -o $(BUILD)/san/bench $(LDLIBS)
 	$(BUILD)/san/bench --all --iters 1 > $(BUILD)/san/out.jsonl
 	@echo "sanitize: OK ($$(wc -l < $(BUILD)/san/out.jsonl) benchmarks ran clean)"
+	$(BUILD)/c/bench --all --iters 1 > $(BUILD)/san/o2.jsonl
+	tools/compare_checksums.py $(BUILD)/san/out.jsonl $(BUILD)/san/o2.jsonl
 
 # ---- codegen identity --------------------------------------------------------
 codegen-compare: $(C_OBJS) $(CX_OBJS)

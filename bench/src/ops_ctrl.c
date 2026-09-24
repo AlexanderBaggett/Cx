@@ -9,13 +9,13 @@
  * updates a recurrence and the else arm stores to memory, so the branch is
  * not if-converted and the loop is not vectorized. */
 
-enum { BRANCH_N = 1 << 16, BRANCH_RANDOM_PASSES = 160, BRANCH_SORTED_PASSES = 300 };
+enum { BRANCH_N = 1 << 16, BRANCH_RANDOM_PASSES = 160, BRANCH_SORTED_PASSES = 560 };
 
 struct branch { uint32_t *d; };
 
-static uint64_t branch_kernel(const uint32_t *d, size_t n) {
+static uint64_t branch_kernel(const uint32_t *d, size_t n, uint64_t seed) {
     uint32_t hist[16] = { 0 };
-    uint64_t s1 = 0, x1 = 1, x2 = 1;
+    uint64_t s1 = 0, x1 = seed, x2 = seed + 1;
     for (size_t i = 0; i < n; i++) {
         uint32_t v = d[i];
         if (v >= 128) {
@@ -53,14 +53,14 @@ static void *branch_sorted_setup(void) { return branch_make(1); }
 static uint64_t branch_random_run(void *state) {
     const struct branch *s = (const struct branch *)state;
     uint64_t h = 0;
-    for (int pass = 0; pass < BRANCH_RANDOM_PASSES; pass++) h = mix(h, branch_kernel(s->d, BRANCH_N));
+    for (uint64_t pass = 0; pass < BRANCH_RANDOM_PASSES; pass++) h = mix(h, branch_kernel(s->d, BRANCH_N, pass));
     return h;
 }
 
 static uint64_t branch_sorted_run(void *state) {
     const struct branch *s = (const struct branch *)state;
     uint64_t h = 0;
-    for (int pass = 0; pass < BRANCH_SORTED_PASSES; pass++) h = mix(h, branch_kernel(s->d, BRANCH_N));
+    for (uint64_t pass = 0; pass < BRANCH_SORTED_PASSES; pass++) h = mix(h, branch_kernel(s->d, BRANCH_N, pass));
     return h;
 }
 
@@ -76,7 +76,7 @@ extern const struct bench bench_branch_unpredictable = {
 };
 
 extern const struct bench bench_branch_predictable = {
-    "branch_predictable", "ops", "the branch_unpredictable kernel on the same bytes, sorted",
+    "branch_predictable", "ops", "the branch_unpredictable kernel on the same bytes, sorted (3.5x the passes)",
     branch_sorted_setup, branch_sorted_run, branch_teardown,
 };
 
@@ -170,7 +170,7 @@ extern int64_t ct_clamp(int64_t v, int64_t lo, int64_t hi);
 extern uint32_t ct_hash(uint32_t x);
 extern void ct_accum(struct ct_acc *acc, int64_t v);
 
-enum { CALLD_N = 1 << 14, CALLD_PASSES = 160 };
+enum { CALLD_N = 1 << 14, CALLD_PASSES = 480 };
 
 struct calld { int32_t *v; };
 
@@ -223,7 +223,7 @@ extern int64_t ct_op_xor(int64_t a, int64_t b);
 extern int64_t ct_op_avg(int64_t a, int64_t b);
 extern int64_t ct_op_shmix(int64_t a, int64_t b);
 
-enum { CALLI_N = 1 << 14, CALLI_PASSES = 160, CALLI_BLOCK = 16 };
+enum { CALLI_N = 1 << 16, CALLI_PASSES = 360, CALLI_BLOCK = 16 };
 
 struct calli { uint8_t *sel; int64_t *val; ct_binop fn[8]; };
 
@@ -275,7 +275,7 @@ extern const struct bench bench_call_indirect = {
 
 /* ---- recursion: naive Fibonacci and a recursive binary-tree walk --------- */
 
-enum { REC_FIB_N = 30, REC_NODES = 1 << 16, REC_TREE_PASSES = 60 };
+enum { REC_FIB_N = 34, REC_NODES = 1 << 16, REC_TREE_PASSES = 30 };
 
 struct tnode { struct tnode *left; struct tnode *right; int64_t val; };
 
@@ -332,7 +332,7 @@ static void rec_teardown([[cx::escapes]] void *state) {
 }
 
 extern const struct bench bench_recursion = {
-    "recursion", "ops", "naive recursive fib(30) plus recursive walks of a 64K-node random BST",
+    "recursion", "ops", "naive recursive fib(34) plus recursive walks of a 64K-node random BST",
     rec_setup, rec_run, rec_teardown,
 };
 
@@ -346,7 +346,7 @@ extern struct sp16 ct_sp16_step(struct sp16 p, int64_t k);
 extern struct sp24 ct_sp24_lerp(struct sp24 p, struct sp24 q, double t);
 extern struct sp32 ct_sp32_mix(struct sp32 x, struct sp32 y);
 
-enum { SP_N = 1 << 14, SP_PASSES = 120 };
+enum { SP_N = 1 << 14, SP_PASSES = 240 };
 
 struct spass { int64_t *k; struct sp24 *v24; struct sp32 *v32; };
 
@@ -376,7 +376,7 @@ static uint64_t spass_run(void *state) {
         struct sp16 a16 = { pass, 1 };
         struct sp24 a24 = { 0.0, 0.0, 0.0 };
         struct sp32 a32 = { pass, 0, 0, 0 };
-        double t = 0.125 + 0.5 * (double)pass / SP_PASSES;
+        double t = 0.125 + 0.5 * (double)pass / (double)SP_PASSES;
         for (size_t i = 0; i < SP_N; i++) {
             a16 = ct_sp16_step(a16, s->k[i]);
             a24 = ct_sp24_lerp(a24, s->v24[i], t);
