@@ -1215,7 +1215,8 @@ Phase 0 answers the central hypothesis (§17): how much of the call-opacity barr
 7. **Runtime extents.** **(inference)** LLVM expresses dereferenceability with constant sizes (the `dereferenceable(N)` attribute; `Loads.cpp:225`). Runtime-size facts from `T a[n]` need an LLVM extension to help beyond bounds checks.
 8. **C callers of Cx code** can violate contracts. Checked builds validate the boundary; release builds trust it.
 9. **Evidence gaps.** The benchmarks so far are integer-heavy. Numeric, media and HPC workloads, where §8 matters most, need their own benchmark set before the FP rules are tuned.
-10. **Keyword removals and existing code.** `volatile`, `_Atomic` and `restrict` are common in C headers. Foreign headers keep them (§14.1). Porting Cx code means rewriting MMIO and atomics (Appendix C).
+10. **Owned elements of pointer arrays.** `[[cx::owned]]` applies to pointer *members* only. A B-tree node's children, hash-table buckets or a vector of owned objects can't say that each element owns its pointee, so such structures fall back to shared semantics or to index-based pools. A candidate is an `[[cx::owned]]` attribute on an array member whose element type is a pointer. Found while writing the benchmark suite (`bench/src/ds_ordered.c`).
+11. **Keyword removals and existing code.** `volatile`, `_Atomic` and `restrict` are common in C headers. Foreign headers keep them (§14.1). Porting Cx code means rewriting MMIO and atomics (Appendix C).
 
 ---
 
