@@ -32,7 +32,7 @@ BUILD    ?= $(if $(ONLY),build-$(ONLY),build)
 SRCS     := $(sort $(wildcard src/$(if $(ONLY),$(ONLY)_,)*.c)) harness/main.c harness/util.c
 BASEFLAGS += $(if $(ONLY),-DBENCH_ONLY_$(ONLY),)
 NAMES    := $(basename $(notdir $(SRCS)))
-HDRS     := $(wildcard harness/*.h)
+HDRS     := $(wildcard harness/*.h src/*.h)
 
 C_OBJS   := $(addprefix $(BUILD)/c/obj/,$(addsuffix .o,$(NAMES)))
 CX_OBJS  := $(addprefix $(BUILD)/cx/obj/,$(addsuffix .o,$(NAMES)))

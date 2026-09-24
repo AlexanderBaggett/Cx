@@ -2,6 +2,7 @@
  * calls, recursion, and structs passed by value. The call targets are in
  * ops_call_targets.c so they cannot be inlined without LTO. */
 #include "bench.h"
+#include "ops_calls.h"
 
 /* ---- branch_unpredictable / branch_predictable --------------------------
  * One kernel, two inputs: the same multiset of bytes in random order (the
@@ -162,14 +163,6 @@ extern const struct bench bench_switch_dispatch = {
 
 /* ---- call_direct: calls to small functions in another translation unit --- */
 
-struct ct_acc { int64_t sum; int64_t count; int64_t max; };
-
-extern int64_t ct_load(const int32_t *p);
-extern int64_t ct_add(int64_t a, int64_t b);
-extern int64_t ct_clamp(int64_t v, int64_t lo, int64_t hi);
-extern uint32_t ct_hash(uint32_t x);
-extern void ct_accum(struct ct_acc *acc, int64_t v);
-
 enum { CALLD_N = 1 << 14, CALLD_PASSES = 480 };
 
 struct calld { int32_t *v; };
@@ -211,17 +204,6 @@ extern const struct bench bench_call_direct = {
 };
 
 /* ---- call_indirect: calls through a table of function pointers ----------- */
-
-typedef int64_t (*ct_binop)(int64_t a, int64_t b);
-
-extern int64_t ct_op_add(int64_t a, int64_t b);
-extern int64_t ct_op_absdiff(int64_t a, int64_t b);
-extern int64_t ct_op_mul(int64_t a, int64_t b);
-extern int64_t ct_op_min(int64_t a, int64_t b);
-extern int64_t ct_op_max(int64_t a, int64_t b);
-extern int64_t ct_op_xor(int64_t a, int64_t b);
-extern int64_t ct_op_avg(int64_t a, int64_t b);
-extern int64_t ct_op_shmix(int64_t a, int64_t b);
 
 enum { CALLI_N = 1 << 16, CALLI_PASSES = 360, CALLI_BLOCK = 16 };
 
@@ -337,14 +319,6 @@ extern const struct bench bench_recursion = {
 };
 
 /* ---- struct_pass: 16-, 24- and 32-byte structs by value ------------------ */
-
-struct sp16 { int64_t a; int64_t b; };
-struct sp24 { double x; double y; double z; };
-struct sp32 { int64_t a; int64_t b; int64_t c; int64_t d; };
-
-extern struct sp16 ct_sp16_step(struct sp16 p, int64_t k);
-extern struct sp24 ct_sp24_lerp(struct sp24 p, struct sp24 q, double t);
-extern struct sp32 ct_sp32_mix(struct sp32 x, struct sp32 y);
 
 enum { SP_N = 1 << 14, SP_PASSES = 240 };
 

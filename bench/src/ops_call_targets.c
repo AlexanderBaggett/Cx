@@ -1,12 +1,11 @@
 /* Out-of-line call targets for call_direct, call_indirect and struct_pass
  * (ops_ctrl.c). They live in their own translation unit so that, without
  * LTO, neither compiler can inline them into the callers. This file defines
- * no benchmark of its own. The struct types are repeated in ops_ctrl.c. */
+ * no benchmark of its own. Shared declarations are in ops_calls.h. */
 #include "bench.h"
+#include "ops_calls.h"
 
 /* ---- call_direct targets ------------------------------------------------ */
-
-struct ct_acc { int64_t sum; int64_t count; int64_t max; };
 
 extern int64_t ct_load(const int32_t *p) { return *p; }
 
@@ -43,10 +42,6 @@ extern int64_t ct_op_avg(int64_t a, int64_t b) { return (a + b + 1) / 2; }
 extern int64_t ct_op_shmix(int64_t a, int64_t b) { return ((a << 3) ^ (b >> 2)) & CT_MASK; }
 
 /* ---- struct_pass targets: 16-, 24- and 32-byte structs by value ---------- */
-
-struct sp16 { int64_t a; int64_t b; };
-struct sp24 { double x; double y; double z; };
-struct sp32 { int64_t a; int64_t b; int64_t c; int64_t d; };
 
 extern struct sp16 ct_sp16_step(struct sp16 p, int64_t k) {
     struct sp16 r;
