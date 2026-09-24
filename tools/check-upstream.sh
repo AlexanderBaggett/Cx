@@ -19,6 +19,8 @@ clang       75aaad8757ca25dfb29bd0c91a9973d655f98afa
 cmake       8564cd0da20c5f686ecc22766cdcdc3142bb12c8
 third-party 270e6e0e497aeaa07ea4181ba733b8f13a7e1c66
 libc        b20ef90dbd50c54742d1d6db6653bf90edb2adc6
+compiler-rt ff15a70afe0541fbbcee112b84e419af6c6be1eb
+runtimes    1be76d9acdc6bf3ac4ffba8d0533706b7af85981
 EOF
 if ! git diff --quiet HEAD -- upstream || [ -n "$(git ls-files --others --exclude-standard upstream | head -1)" ]; then
     echo "MODIFIED  upstream/ has uncommitted changes"; status=1
