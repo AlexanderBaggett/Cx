@@ -226,9 +226,9 @@ struct bt_node {
 
 /* Nodes live in a pool allocated at full size by setup(), like the pages of
  * a database's buffer pool, and children are pool indices. run() builds the
- * tree in an empty pool and releases it by emptying the pool. (With a
- * malloc per 400-byte node, glibc returns the freed heap to the kernel after
- * every run, and every run page-faults it back in.) */
+ * tree in an empty pool and frees it by emptying the pool. (With one malloc
+ * per ~400-byte node, glibc handed the freed heap back to the kernel at the
+ * end of every run and page-faulted it back in during the next.) */
 struct btree {
     [[cx::owned]] struct bt_node *pool;
     size_t len;
