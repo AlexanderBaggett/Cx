@@ -55,8 +55,8 @@
 ### 1.3 Principles, derived from the evidence
 
 - **P1 Information over UB.** In the analysis, relaxing C's UB-based rules (strict aliasing, signed overflow, null checks, forward progress) changed whole-program speed by no more than the ±2.5% noise floor [A§5.5]. What does matter:
-  - **Call opacity.** In SQLite, 71% of the loads GVN failed to remove were blocked by a call. In 93% of those cases the callee had no inferable memory effects [A§4.1].
-  - **Cross-file visibility.** Visibility changed whole-program speed by 3.3–4.7% in every round [A§5.4].
+  - **Call opacity.** In SQLite, 71% of the loads GVN failed to remove were blocked by a call. 83% of those calls go to functions in the same file, and 93% of those callees had no inferable memory effects [A§4.1].
+  - **Cross-file visibility.** The median effect on whole-program speed was 3.3–4.7%. Every round agreed on the direction; single rounds ranged from 0.2% to 12% [A§5.4].
 
   Cx therefore makes *information* the default:
   - pointers don't alias, don't escape and aren't null;
@@ -119,7 +119,7 @@ C23 has 54 keywords plus 5 alternate spellings (`_Alignas`, `_Alignof`, `_Bool`,
 | `typedef` | File scope only, and may not be shadowed (§13.3) |
 | `const` | The only type qualifier. It gains meaning for pointer parameters: the pointee is immutable for the whole call (§5.1). |
 | `static` | Block scope: static storage duration, as C23. File scope: accepted and redundant, because file scope is private by default (§4.1). The `[static n]` array-parameter form is removed, because extents are implied (§5.6). |
-| `extern` | On a definition: **exports** it from the module. On a declaration: declares an entity defined elsewhere (§4.1). |
+| `extern` | On a definition: **exports** it from the module. On a declaration: refers to the module's own definition, or to another module's export or foreign code (§4.1.3). |
 | `inline` | On an exported function, the body becomes part of the module's interface for cross-module inlining. Otherwise it is a hint. C99's inline-definition and external-definition rules are removed (§6.8). |
 | `sizeof` `alignof` `alignas` | As C23. `sizeof` is always a constant expression (no VLAs). |
 | `static_assert` `constexpr` | As C23. `constexpr` is the preferred way to write constants (§13.2). |
@@ -174,6 +174,14 @@ The alternate spellings `_Alignas`, `_Alignof`, `_Bool`, `_Static_assert` and `_
 - `extern` on a *declaration* refers to an entity exported by another module or by foreign code.
 - `static` at file scope is accepted and redundant.
 
+**Rule 4.1.3: declarations that are not definitions.** A function prototype, or an object declaration with `extern`, that has no storage class or has `extern`:
+- refers to the module's own definition if the module defines that entity;
+- otherwise refers to an entity exported by another module, or defined by foreign code.
+
+This applies both in `.cx` modules and in header units. So a `.cxh` declares a module's exports with plain prototypes, as C headers do. `static` definitions in a header unit, such as `static inline` helpers, are private to each including module.
+
+**Rule 4.1.4: `main`.** `main` is always exported with the C ABI, as if declared `[[cx::c_abi]] extern`. Its `argv` parameter is `[[cx::escapes]]`, because the runtime keeps it alive for the whole program.
+
 **Why:**
 - Most interprocedural passes require local linkage: GlobalOpt (`GlobalOpt.cpp:1671-1673`, `:1983-1988`), ArgumentPromotion (`:816-818`), DeadArgumentElimination (`:463-466`), GlobalsAA (`GlobalsModRef.cpp:276-278`), and the inliner's 15,000 "last call to a static function" bonus (`InlineCost.cpp:1251-1254`) [A§4.6].
 - In C, forgetting `static` silently disables all of them.
@@ -184,7 +192,9 @@ The alternate spellings `_Alignas`, `_Alignof`, `_Bool`, `_Static_assert` and `_
 
 ### 4.2 Interposition
 
-**Rule 4.2.1.** Exported definitions have protected visibility in shared objects, and are `dso_local` in executables. They cannot be interposed unless declared `[[cx::interposable]]`.
+**Rule 4.2.1.** Exported *functions* have protected visibility in shared objects, and are `dso_local` in executables. They cannot be interposed unless declared `[[cx::interposable]]`.
+
+Exported *objects* keep default visibility. That avoids conflicts with copy relocations in non-PIE executables. It costs nothing that matters here, because optimizing globals requires module-private objects anyway (§4.1).
 
 **Why:** an interposable definition is never inlined (`InlineCost.cpp:3237-3239`), gets no inferred attributes (`GlobalValue.h:473-490`), and is called through the PLT [A§4.6], [E10].
 
@@ -208,7 +218,7 @@ For every exported object it records its type, extent and constness.
 **Rule 4.3.3: cycles.** Modules that depend on each other in a cycle are compiled as a group. The compiler either iterates the summaries to a fixed point (`-fcx-summary-iterate`), or uses only the explicit declared summaries inside the cycle.
 
 **Why:**
-- Lua built as one file is 4.7% faster than as 32 files in every round [A§5.4].
+- Lua built as one file is 4.7% faster (median) than as 32 files, and faster in every round [A§5.4].
 - In the 32-file Lua build, 58.7% of the calls that block load elimination go to another file [A§4.1].
 - Summaries give clients the facts that matter without whole-program LTO. They are like ThinLTO summaries, but produced at compile time and consumed by the front end.
 
@@ -222,9 +232,15 @@ For every exported object it records its type, extent and constness.
 
 **Rule 4.5.1: one definition.** Every object and function has exactly one definition.
 - At file scope, `int x;` is a definition (zero-initialized). `extern int x;` is a declaration.
-- Tentative definitions and common symbols do not exist.
+- **Exception, forward declarations:** a declaration without an initializer that is followed, in the same module, by a declaration of the same object *with* an initializer is a forward declaration. This lets mutually referring private tables be declared, as in `static const op_fn ops[16];`. At most one declaration may have an initializer.
+- There is no merging across modules and there are no common symbols.
 
-**Rule 4.5.2: identical redeclarations.** All declarations of an entity must have identical types. C's compatible-type rules and composite types are not used; struct types are nominal, identified by module and tag.
+**Rule 4.5.2: identical redeclarations.** All declarations of an entity must have identical types. C's compatible-type rules and composite types are not used.
+
+**Struct type identity:**
+- A non-`c_layout` struct type declared in a `.cx` module is identified by that module plus its tag.
+- One declared in a header unit is identified by the header unit plus its tag, so every includer sees the same type.
+- `c_layout` and foreign struct types follow C's compatible-type rule across modules, so a struct from a C header included by two modules is one type.
 
 **Why:** this removes `mergeTypes` and redeclaration merging from the semantic core [A§3.6], and object storage is known as soon as the object is defined.
 
@@ -245,10 +261,26 @@ For a parameter `P` of pointer type `T *` (where `T` may be `const`-qualified), 
   - This is C23's `restrict` (6.7.4.2), applied by default. "Based on" has C's meaning: values computed from `P` by arithmetic, conversion, member access or subscripting.
 - **5.1.2 Read-only is immutable.** If `T` is `const`-qualified, the objects accessed through `P` are **not modified by anyone** during `B`, and writing through a pointer derived from `P` by casting away `const` is UB.
 - **5.1.3 Non-escaping.**
-  - No value based on `P` is stored into any object except an automatic variable of `B` whose address is not taken. No such value is exposed as an integer (§5.5), passed to an `[[cx::escapes]]` parameter, or freed.
-  - `P`-based values *may* be returned. The caller then treats the result as based on the argument it passed.
+  - No value based on `P` may be:
+    - stored into any object except an automatic object of `B` (a variable or compound literal) that does not itself escape — its address may only be passed to non-escaping parameters;
+    - exposed as an integer (§5.5);
+    - passed to an `[[cx::escapes]]` parameter;
+    - freed.
+  - `P`-based values *may* be returned directly as the function's result, or inside an aggregate returned in registers (§10.1). The caller then treats the result as based on the argument it passed.
+  - Returning a `P`-based value inside an aggregate returned through memory (larger than the `cxcall` register limit) is an error unless `P` is `[[cx::escapes]]`.
+  - When the callee's summary is unknown (a function pointer without effect bounds, or a missing summary file), the caller assumes the result may be based on *every* pointer argument.
 - **5.1.4 Non-null.** `P` is not a null pointer.
-- **5.1.5 Dereferenceable.** If `T` is a complete object type, `P` points to at least `sizeof(T)` bytes that stay valid (not freed) throughout `B`. Array parameters extend this to `n` elements (§5.6).
+- **5.1.5 Dereferenceable.**
+  - If `T` is a complete object type, `P` points to at least `sizeof(T)` bytes that stay valid (not freed) throughout `B`.
+  - This is a *minimum*: `P` may point into a larger array, and pointer arithmetic within that array follows C's rules.
+  - Array parameters `T a[n]` extend the guarantee to `n` elements (§5.6). Only those parameters are bounds-checked.
+- **5.1.6 No concurrent access.** For a non-`const` exclusive parameter, no other thread accesses (reads *or* writes) the objects in `P`'s region during `B`, and those objects are writable memory. This is stronger than `restrict`. It is what makes introducing stores sound (`writable`, §12.2).
+
+**Definitions used throughout §5 and §6.**
+- ***Based on*** has C23's meaning (6.7.4.2): a pointer expression is based on `P` if it is computed from `P` by arithmetic, conversion, member access, subscripting or conditional selection. Its value is derived from `P`, not loaded from memory. A pointer *loaded* from memory is based on `P` only in the case §5.3 defines: a load from an owned field of an object in `P`'s region.
+- The ***region*** of `P` is:
+  1. the whole complete object, or allocation, that `P` points into (an entire array, not just `*P`);
+  2. every object transitively owned through `[[cx::owned]]` fields of objects already in the region (§5.3).
 
 **Opt-outs.** These attributes attach to the parameter, for example `void f([[cx::alias, cx::nullable]] int *p)`:
 
@@ -269,14 +301,15 @@ For a parameter `P` of pointer type `T *` (where `T` may be `const`-qualified), 
 | Parameter | IR attributes |
 |---|---|
 | `T *` | `noalias nonnull noundef dereferenceable(sizeof T) captures(ret: address, provenance) writable` (plus `nofree`) |
-| `const T *` | Same, but `readonly` instead of `writable`. Loads through `P` may be marked `!invariant.load` within `B`. |
+| `const T *` | Same, but `readonly` instead of `writable`. `readonly` + `noalias` already let LLVM treat the pointee as unchanged during `B`. `!invariant.load` must **not** be used: it would also claim invariance outside the call after inlining. |
 | With opt-outs | The corresponding attributes are dropped |
 
-At call sites the same facts let SROA and mem2reg keep a local's value in registers after `f(&local)`, because the local stays uncaptured.
+At call sites, `captures(none)` keeps a local uncaptured after `f(&local)`. GVN can then forward its stored value across later calls, and DSE can remove dead stores to it. The local itself stays in memory, because its address was used.
 
 **Enforcement:**
 - 5.1.3 is **compile-time**. The compiler tracks based-on values within each function and rejects stores of them to memory. This is local and complete, because every callee declares what it does with its parameters.
 - 5.1.4 is **checked**: an entry check in checked builds; call sites that pass a literal `nullptr` are rejected.
+- 5.1.6 is a **contract**. The compiler rejects atomic operations (§12.1) and MMIO (§12.3) through an exclusive parameter: such parameters must be `[[cx::alias]]`.
 - 5.1.1 and 5.1.2 are a **contract**, like `restrict`. The compiler rejects the provable violations: the same object, or overlapping `P`/`P+k` with a known extent, passed to two parameters where one is written. Checked builds check range overlap for parameters with extents.
 
 ### 5.2 Local pointers
@@ -296,7 +329,12 @@ At call sites the same facts let SROA and mem2reg keep a local's value in regist
 
 **Lowering:**
 
-- **Scopes.** For each function, the front end creates one alias scope per *access path*, meaning a parameter root followed by a sequence of owned fields: `P`, `P.f`, `P.f.g`, … Paths deeper than *k* (default 3) are cut off at a summary scope `P.*`. Module-private globals each get a scope, and so does a *shared* scope.
+- **Scopes.** For each function, the front end creates one alias scope per *access path*, meaning a parameter root followed by a sequence of owned fields: `P`, `P.f`, `P.f.g`, …
+  - Paths deeper than *k* (default 3) are cut off at a summary scope `P.*`.
+  - Module-private globals each get a scope, and so does a *shared* scope.
+- **Which pointers get a path scope.** A pointer gets the scope of a specific path only if it is *syntactically* that path: an expression `P->f->g`, or a local initialized from such an expression and never assigned another value.
+  - Other pointers into a root's region get the root's *unknown sub-path* scope `P.?`. This covers conditional merges (`c ? P->a : P->b`), pointers updated in loops (`n = n->next` over an owned `next`), and pointers returned by calls. `P.?` is `!noalias` only against *other roots'* scopes, never against `P`'s own paths.
+  - Pointers whose root is unknown get no scope metadata.
 - **Tagging loads and stores.** Every load or store whose address derives from a path gets `!alias.scope {path}` and `!noalias {every other root's scopes}`. Different paths under the same root are also mutually `!noalias`, because different objects in an ownership tree are disjoint.
 - **Tagging calls.** A call instruction gets `!alias.scope` for:
   - the scopes of the regions passed to it;
@@ -309,8 +347,14 @@ At call sites the same facts let SROA and mem2reg keep a local's value in regist
 
 **Why:** in SQLite, 93.4% of the same-file callees that block GVN summarize as "may read or write any memory". Writing through a pointer loaded from a struct lands in LLVM's catch-all "other memory" location [A§4.1]. Ownership lets the front end give those objects names (scopes) that survive calls.
 
+**Rule 5.3.3: overlapping regions.** Passing two pointers into the same region, for example `g(P, P->f)`, to two exclusive parameters of which either is written is an exclusivity violation (5.1.1). The compiler rejects it when both arguments are paths from the same root.
+
 **Enforcement:** **contract**.
-- The compiler diagnoses the obvious violations: the same value stored to two owned fields; an owned field stored to a global; the address of an owned object passed to an `[[cx::escapes]]` parameter without clearing the field.
+- The compiler diagnoses the obvious violations:
+  - the same value stored to two owned fields;
+  - an owned field stored to a global;
+  - the address of an owned object passed to an `[[cx::escapes]]` parameter without clearing the field;
+  - rule 5.3.3.
 - Ownership is opt-in per field. Unmarked pointer fields are *shared*, which gives exactly C's (conservative) semantics.
 
 ### 5.4 Type-based aliasing
@@ -326,7 +370,7 @@ At call sites the same facts let SROA and mem2reg keep a local's value in regist
 
 **Why:**
 - The byte-fill loop [E02] is 34× slower only because the `char` store may overwrite `b->data` and `b->len` (`CodeGenTBAA.cpp:166-174`).
-- Type-based alias analysis prevents 60% of SQLite's store-clobbered loads [A§4.2].
+- Without type-based alias analysis, SQLite has 60% *more* store-clobbered loads (53,336 → 85,390), so TBAA removes about 37% of them [A§4.2].
 - Unions currently get no TBAA at all (`CGExpr.cpp:5856-5858`).
 
 **Lowering:**
@@ -347,6 +391,10 @@ At call sites the same facts let SROA and mem2reg keep a local's value in regist
 
 **Why:** `ptrtoint` counts as a capture (`CaptureTracking.cpp:391-393`), and `inttoptr` makes any escaped object a possible target (`AliasAnalysis.cpp:948-957`). Strict provenance keeps address arithmetic, hashing, alignment tricks and tagged pointers from defeating escape analysis.
 
+**Lowering:**
+- `(uintptr_t)p` lowers to LLVM 23's `ptrtoaddr`. Capture tracking counts it as an address-only capture (`CaptureTracking.cpp:371-376`), so it does not make the object escape.
+- `cx_expose` lowers to `ptrtoint`.
+
 **Enforcement:** compile-time (the cast forms are restricted); the provenance itself is a contract.
 
 ### 5.6 Arrays and extents
@@ -356,6 +404,8 @@ At call sites the same facts let SROA and mem2reg keep a local's value in regist
 **Rule 5.6.2: flexible array members.** Only `T a[];` is a flexible array member. Trailing `[0]` and `[1]` arrays have their declared bounds, equivalent to `-fstrict-flex-arrays=3` (`LangOptions.h:390-392`).
 
 **Rule 5.6.3: no VLAs.** There are no variable-length arrays. `sizeof` is always a constant.
+- In an array parameter, only the *outermost* bound may be a run-time value (`T a[n]` or `T a[n][8]`).
+- Inner bounds must be constants, because a runtime inner bound would be a variably modified type. Runtime two-dimensional data uses a flat array with explicit indexing.
 
 **Why:** array decay loses extents, which is why the vectorizer reports "cannot identify array bounds" [A§3.7], [A§4.2].
 
@@ -398,7 +448,7 @@ At call sites the same facts let SROA and mem2reg keep a local's value in regist
 
 | Summary item | IR |
 |---|---|
-| Parameter regions | `memory(argmem: …)` for the direct objects, plus scope metadata (§5.3) for owned paths |
+| Parameter regions | `memory(argmem: …)` for the directly pointed-to objects. If the region includes owned paths, `other` is added too: LLVM counts memory reached through loaded pointers as other memory. Precision then comes from the scope metadata (§5.3). |
 | The callee's `module` | `inaccessiblemem`: the callee's private globals cannot be named by the caller |
 | `alloc`, `io` | `inaccessiblemem` (and `errnomem` for foreign `io`) |
 | `shared` | `other` |
@@ -406,6 +456,13 @@ At call sites the same facts let SROA and mem2reg keep a local's value in regist
 | No `sync` | `nosync` |
 
 GlobalsAA then sees through calls to Cx functions (`GlobalsModRef.cpp:547-553` requires `nocallback` + `nosync` for external calls).
+
+**Placement and LTO.**
+- Summary-derived attributes are placed only on the *declarations* of functions from other modules, never on call sites.
+- When LTO or ThinLTO merges modules, the definition replaces the declaration, and its attributes are re-derived from the body by FunctionAttrs. Claims such as `inaccessiblemem` for another module's private state, or `nocallback`, therefore never survive into a merged module, where they could be false.
+- The implementation must verify this with a test (§20).
+
+**Inference over recursion.** Summaries of mutually recursive functions (a strongly connected component of the call graph) are computed as the least fixed point: start from `none` and take unions until nothing changes.
 
 **Why:** without summaries, a call to anything opaque is `ModRef` for all memory (`BasicAliasAnalysis.cpp:1076-1077`). That is the single largest source of missed optimizations measured [A§4.1]. It even keeps an address-never-taken `static` counter in memory [E03], because the callee might call back into the module.
 
@@ -421,7 +478,9 @@ GlobalsAA then sees through calls to Cx functions (`GlobalsModRef.cpp:547-553` r
 
 **Rule 6.2.2: closed sets.** If a function-pointer type is module-private and no value of that type enters the module from outside, the set of possible targets is the set of functions converted to that type in the module.
 
-**Lowering:** the call's effects are the union of the targets' summaries, plus `!callees` metadata, which the Attributor and CalledValuePropagation already understand (`AttributorAttributes.cpp:12384`, `CalledValuePropagation.cpp:400`).
+**Lowering:** the call's effects are the union of the targets' summaries, plus `!callees` metadata. The Attributor reads that metadata (`AttributorAttributes.cpp:12384`); CalledValuePropagation produces the same kind of metadata (`CalledValuePropagation.cpp:400`).
+
+**Rule 6.2.3: parameter attributes are part of the type.** Parameter attributes (`alias`, `escapes`, `nullable`) and `[[cx::c_abi]]` are part of a function-pointer type. Assigning a function to a pointer of a different type is an error.
 
 **Why:** indirect calls are 16.5% (SQLite) and 12.9% (Lua) of the calls that block load elimination. They are never inlined (`InlineCost.cpp:3189-3191`) and they block `norecurse` [A§4.1], [A§4.5].
 
@@ -435,7 +494,11 @@ GlobalsAA then sees through calls to Cx functions (`GlobalsModRef.cpp:547-553` r
 2. **Loops.** Loops fall under the same rule, whatever their controlling expression.
 3. **Intentional infinite loops.** A loop with an omitted or constant-true controlling expression may run forever only if its body performs an observable effect. An infinite loop with an empty body is an error.
 
-**Why:** C functions never get `mustprogress` (`CodeGenFunction.h:646-651`), so LLVM cannot infer `willreturn` for C functions with loops (`FunctionAttrs.cpp:2161-2174`). Loops with constant conditions or built from `goto` get no progress guarantee [A§4.5]. [E11] shows the language version alone changing codegen.
+**Why:**
+- C functions never get `mustprogress` (`CodeGenFunction.h:646-651`), and loops with constant conditions or built from `goto` get no progress guarantee [A§4.5].
+- With `mustprogress`, LLVM may delete side-effect-free loops, and it infers `willreturn` for functions that only read memory (`FunctionAttrs.cpp:2161-2174`).
+- **(inference)** For functions that write memory and contain loops, LLVM still infers nothing. Cx's own effect analysis can add `willreturn` when every loop in a function has a computable trip count.
+- [E11] shows the language version alone changing codegen.
 
 **Lowering:** `mustprogress` on every function and loop.
 
@@ -451,7 +514,7 @@ GlobalsAA then sees through calls to Cx functions (`GlobalsModRef.cpp:547-553` r
 - stack coloring (`StackColoring.cpp:721-724`);
 - tail-call elimination.
 
-It also makes every non-escaped object look clobbered (`BasicAliasAnalysis.cpp:984-989`).
+It also makes non-escaped objects that aren't allocas, such as `noalias` call results, look clobbered (`BasicAliasAnalysis.cpp:984-989`).
 
 **Enforcement:** compile-time.
 
@@ -491,10 +554,16 @@ It also makes every non-escaped object look clobbered (`BasicAliasAnalysis.cpp:9
 - `inline` on a private function is a hint.
 - `static inline` in a header unit behaves as today.
 - C99's inline-definition and external-definition distinction (`available_externally`) is removed (`ASTContext.cpp:13129-13130`).
+- **Private references.** An exported `inline` body may refer to module-private entities. The compiler then emits those entities with hidden visibility, under a module-qualified symbol name. That way inlined copies in other modules link correctly, while other modules' *source code* still cannot name them.
+- **Interposable functions.** The summaries and bodies of `[[cx::interposable]]` functions are never used by other modules, because they may be replaced at link time.
 
 ### 6.9 By-value aggregates
 
-**Rule 6.9.1.** Aggregates passed by value keep C's value semantics. Under `cxcall` (§10.1), aggregates larger than the register limit are passed as a pointer to the *caller's* object, and **the callee copies them only if it modifies the parameter** (callee-copy). The parameter contract (§5.1) makes this sound: the object is exclusive for the duration of the call.
+**Rule 6.9.1.** Aggregates passed by value keep C's value semantics. Under `cxcall` (§10.1), aggregates larger than the register limit are passed as a pointer:
+- **The caller passes a pointer to its own object** only if that object is a local or temporary that has not escaped, and that is not also reachable through another argument of the same call. Otherwise the caller passes a pointer to a copy.
+- **The callee copies** the aggregate only if it modifies the parameter.
+
+Together these preserve value semantics even for `f(g, &g)`, or a callee that modifies the global it was passed by value.
 
 **Why:** today, SysV `byval` copies the aggregate to the stack on every call [A§4.7], [E09].
 
@@ -507,6 +576,10 @@ It also makes every non-escaped object look clobbered (`BasicAliasAnalysis.cpp:9
 **Rule 7.1.1: overflow is a violation.** Overflow of `+`, `-`, `*`, unary `-`, `++`, `--` and compound assignment is a violation for *all* standard integer types, signed and unsigned: it traps in checked builds and is UB in release. The same applies to division by zero, `INT_MIN / -1`, and the matching `%` cases. The evaluation type follows C's promotions (§7.2).
 
 **Rule 7.1.2: wrapping types.** Modular arithmetic is explicit. `<cxwrap.h>` defines `wuint8_t` … `wuint64_t` and `wint8_t` … `wint64_t`, for example `typedef uint32_t wuint32_t [[cx::wrapping]];`.
+- `[[cx::wrapping]]` and `[[cx::may_alias]]` typedefs create **distinct types** (strong typedefs), unlike ordinary C typedefs:
+  - converting to or from the underlying type needs an explicit cast (integer constants excepted);
+  - `_Generic` distinguishes them;
+  - they count as different types for §4.5.2 and for aliasing.
 - Arithmetic whose operands all have the *same* wrapping type is performed in that type, modulo 2ⁿ, with no integer promotion. Mixing a wrapping type with a different integer type is an error unless the other operand is a constant that fits.
 - C23's `<stdckdint.h>` (`ckd_add` and similar) gives checked arithmetic with an overflow flag.
 - An explicit cast to a narrower type truncates modulo 2ⁿ, which is defined behaviour, exactly as in C.
@@ -531,6 +604,8 @@ It also makes every non-escaped object look clobbered (`BasicAliasAnalysis.cpp:9
 1. **Promotions stay.** The integer promotions keep their C meaning: narrow types compute in `int`.
 2. **No mixed signedness.** A binary operator or comparison whose operands, after promotion, differ in signedness, or mix wrapping and non-wrapping types, is an error. The exception is when one operand is an integer constant expression representable in the other's type.
 3. **No implicit narrowing.** Implicit conversion to a narrower type, or to a type that can't represent all source values, is an error unless the source is a constant that fits. Explicit casts are always allowed and truncate modulo 2ⁿ.
+   - This includes floating point: `double` → `float`, and integer → floating types that can't represent every value (such as `int32_t` → `float` and `int64_t` → `double`), need explicit casts.
+   - **Compound assignment and `++`/`--` are the exception.** For `x op= y`, `x++` and `x--`, the value is computed with the usual promotions and implicitly converted back to `x`'s type. If the result is not representable in that type, it is an overflow violation (§7.1), unless the type is a wrapping type. So for a `uint8_t` holding 255, `u8 += 1` is checked, but it is not a narrowing error.
 4. **No implicit integer↔pointer.** There are no implicit conversions between integers and pointers (C already requires a diagnostic; Cx makes it an error). Explicit forms follow §5.5.
 5. **No implicit `void *`.** Implicit conversion from `void *` to another object pointer type is allowed only from the results of allocation functions (`malloc`, `calloc`, `realloc`, `aligned_alloc`, and functions with `alloc` effects that return `void *`). Otherwise a cast is required.
 
@@ -548,9 +623,10 @@ It also makes every non-escaped object look clobbered (`BasicAliasAnalysis.cpp:9
 - Left shift of a signed value that changes the sign bit or loses significant bits is a violation (checked). Emit `nsw` on signed `shl`; today there is none (`CGExprScalar.cpp:5139`).
 - Unsigned shifts discard shifted-out bits, as in C: bit manipulation is not arithmetic.
 
-### 7.4 `char` and `bool`
+### 7.4 `char`, `bool` and string literals
 
 - Plain `char` is **unsigned** 8-bit on every target, and is a distinct type from `unsigned char` (§9.1).
+- String literals have type `const char[N]`, where C23 gives them `char[N]`. They can never be written, which §5.1.6 relies on.
 - `bool` is as C23. Loads carry range `[0,2)`, as today.
 
 ---
@@ -571,7 +647,7 @@ It also makes every non-escaped object look clobbered (`BasicAliasAnalysis.cpp:9
 **Rule 8.4: contraction.** Contraction is on within an expression (`#pragma STDC FP_CONTRACT` defaults to `ON`), as Clang does today.
 
 **Rule 8.5: reassociation is opt-in and scoped.**
-- `#pragma cx fp_reassociate(on)` in a block allows reassociation of `+` and `*` (and assumes no signed-zero sensitivity) for operations lexically inside the block.
+- `#pragma cx fp_reassociate(on)` allows reassociation of `+` and `*`, and assumes no signed-zero sensitivity. It applies to the operations lexically after the pragma, up to the end of the enclosing compound statement. The pragma may appear anywhere a declaration or statement may appear. `#pragma cx fp_reassociate(off)` ends it early.
 - `<cxmath.h>` also provides reduction functions: `cx_sumf(n, a)`, `cx_sum(n, a)`, `cx_dotf(n, a, b)`, `cx_dot(n, a, b)`, and min/max. They reassociate by definition.
 - Nothing else changes. There is no global `-ffast-math` in the language.
 
@@ -600,12 +676,13 @@ It also makes every non-escaped object look clobbered (`BasicAliasAnalysis.cpp:9
 **Rule 9.2.1: enums are closed.** An object of enum type holds only the values of its enumerators.
 - Conversion from an integer to an enum requires an explicit cast, and is checked.
 - The underlying type is `int` unless C23's `enum E : T` syntax is used.
+- The value 0 is always valid for every enum type, even if no enumerator is 0. This way static zero-initialization, `calloc` and `memset` never produce an invalid enum.
 - An enum declared `[[cx::flags]]` is open: bitwise combinations are valid, and its range is the underlying type.
 
 **Why:** C enums get no range metadata (`CGExpr.cpp:2095-2098`) and alias `int` (`CodeGenTBAA.cpp:343-344`).
 
 **Lowering:**
-- `!range` on loads of closed enums.
+- `!range` on loads of closed enums, covering the enumerator values and 0.
 - A distinct TBAA node per enum.
 - An exhaustive `switch` over a closed enum gets an `unreachable` default.
 
@@ -626,10 +703,15 @@ Guaranteed:
 - `offsetof` is a constant;
 - `sizeof` and `alignof` are as computed.
 
+Always true:
+- a flexible array member stays last;
+- an anonymous struct or union member is laid out as one unit, keeping its members together.
+
 Not guaranteed:
 - field order;
 - that the first member is at offset 0 (so casting `struct S *` to a pointer to its first member is invalid);
-- where the padding goes.
+- where the padding goes;
+- the *common initial sequence* guarantee of C23 6.5.2.3. For non-`c_layout` types it does not exist.
 
 **Rule 9.4.2: `[[cx::c_layout]]`.** A struct or union declared `[[cx::c_layout]]` has exactly C's layout. It is **required**, and is a compile-time error to omit, when the type:
 - appears in a foreign declaration or an `[[cx::c_abi]]` function (§14);
@@ -678,8 +760,11 @@ AArch64 follows the same pattern: aggregates up to 4 registers, homogeneous aggr
 
 **Rule 10.2.1.**
 - Foreign declarations use the platform C ABI.
-- A Cx function that C must call is declared `[[cx::c_abi]] extern`. It then uses the C ABI and accepts only `c_layout` aggregates.
+- A Cx function that C must call is declared `[[cx::c_abi]]`. It then uses the C ABI and accepts only `c_layout` aggregates.
+- It may be exported (`extern`), or module-private when it is only passed as a callback to C, e.g. to `qsort`, `atexit`, `thrd_create` or `signal`.
 - Its pointer parameters still carry Cx semantics, which are a contract for the C caller (§14.2).
+
+**Rule 10.2.2.** A C-ABI function-pointer type is either a function-pointer type from a foreign header, or a typedef marked `[[cx::c_abi]]`, e.g. `typedef int (*cmp_fn)(const void *, const void *) [[cx::c_abi]];`. Only `[[cx::c_abi]]` functions convert to it.
 
 ---
 
@@ -708,7 +793,7 @@ Unsequenced-modification UB is removed.
 2. **No bypassing.** No jump (`goto`, `switch` → `case`) may bypass the declaration of a variable whose scope contains the target.
 3. **Top-level `case` labels.** `case` and `default` labels must appear at the top level of the `switch` body, so they can't jump into nested statements. Duff's device is removed.
 
-Forward `goto` for cleanup (`goto fail;`) stays fully supported.
+Forward `goto` for cleanup (`goto fail;`) stays supported, with one condition. Every variable whose scope contains the label must be declared *before* the first `goto` that targets it, typically at the top of the function, or else inside a nested block that the jump leaves entirely. The common C pattern that declares variables between the `goto` and the label must be restructured.
 
 **Why:**
 - With only forward jumps, every loop is a `for`/`while`/`do` statement, so the CFG is **reducible** and every loop gets loop metadata and `mustprogress`. Loops built from `goto` get none (inference from `CGStmt.cpp:1114-1117`).
@@ -724,7 +809,9 @@ Forward `goto` for cleanup (`goto fail;`) stays fully supported.
 ### 11.4 Initializers
 
 **Rules:**
-- Nested aggregates must be written with their own braces. Brace elision is removed, except for a string literal initializing a `char` array.
+- Nested aggregates must be written with their own braces. Brace elision is removed, with two exceptions:
+  - a string literal initializing a `char` array;
+  - the initializers `{}` (C23) and `{0}`, which zero-initialize any object.
 - Designators may appear in any order, but each subobject may be initialized **at most once**. Overriding is an error.
 
 **Why:** the rules simplify `InitListChecker` (~3,300 lines, which today runs twice) [A§3.8], and remove override-order surprises.
@@ -754,7 +841,7 @@ Expressions and statements not mentioned here are unchanged from C23. That inclu
 
 ### 12.2 Data races
 
-Unchanged from C11/C23: a data race is UB. With exclusive parameters (§5.1), no other thread can access an exclusive object during the call, so introducing stores (`writable`) is sound.
+Unchanged from C11/C23: a data race is UB. Rule 5.1.6 additionally guarantees that no other thread reads or writes a non-`const` exclusive parameter's region during the call, and that the region is writable memory. That is what makes introducing stores (`writable`) sound. Parameters used for atomic operations or MMIO must be `[[cx::alias]]`.
 
 ### 12.3 Memory-mapped I/O
 
@@ -825,7 +912,14 @@ Unknown `cx` pragmas are errors.
 ### 14.1 Calling C from Cx
 
 - **Foreign headers.** `#include` of a foreign header (anything not `.cxh`) parses it with the **full C23 language**, including every keyword removed in §3. Its declarations are imported as foreign.
-- **Foreign semantics.** Foreign functions use the C ABI and have unknown effects. Their pointer parameters are treated as `[[cx::alias, cx::escapes, cx::nullable]]`, except that C `restrict` parameters are treated as exclusive. Foreign structs are `c_layout`.
+- **Foreign semantics.**
+  - Foreign functions use the C ABI and have unknown effects.
+  - Their pointer parameters are treated as `[[cx::alias, cx::nullable]]`, except that C `restrict` parameters are treated as exclusive.
+  - **Retention:** passing a pointer to a foreign function does not count as an escape, unless the declaration marks the parameter `[[cx::escapes]]`, or marks the function `[[cx::escapes]]` for its variadic arguments. This is a **contract** (§16): unannotated foreign functions are trusted not to retain pointers beyond the call. Without it, a Cx function could not pass its own parameters to `printf`.
+  - The Cx standard headers mark every standard function that does retain a pointer (§15).
+  - Foreign structs are `c_layout`.
+- **Foreign tokens.** Declarations and macro expansions that originate in foreign headers are parsed with the full C23 keyword set plus GNU extension keywords (`__extension__`, `__restrict`, `__inline`, `__attribute__`, `__asm__`). This covers macros such as `assert`, `FD_SET` and `<tgmath.h>` used inside Cx code.
+- **Foreign types Cx cannot spell.** Entities whose types use features Cx removed (a `volatile` or `_Atomic` object, a `long double` or `_Complex` parameter) may be used with C semantics where the expression needs no removed type in Cx code. Otherwise, using them is an error; wrap them in a C function. `typeof` of such an entity is an error.
 - **Cx annotations.** A `.cxh` may redeclare a foreign function with Cx attributes, for example effects or non-null parameters, to give Cx callers more precise facts. These redeclarations are trusted contracts. The Cx standard headers do this for libc (§15).
 - **Foreign variadics.** Foreign variadic functions may be called. Arguments undergo C's default argument promotions.
 
@@ -855,8 +949,8 @@ C and Cx modules link together with no glue. The same compiler binary compiles b
 | `strlen` | `const char *s` | `reads(s)` |
 | `malloc` | — | `alloc` |
 | `free` | `[[cx::escapes, cx::nullable]] void *p` | `alloc` |
-| `qsort` | — | `callback`, with the comparator typed as an effect-bounded function pointer when called from Cx |
-| `printf` | — | `io` |
+| `qsort` | default (exclusive `base`) | `reads(base), writes(base), callback`. When called from Cx, the comparator is typed as an effect-bounded function pointer. |
+| `printf` family | variadic arguments are not retained | `io`, plus `reads` through the format and every pointer argument, including variadic ones. `%n` is rejected in literal formats. A non-literal format containing `%n` is a contract violation. |
 
 **Rule 15.2: changed and removed headers.**
 
@@ -901,7 +995,8 @@ C and Cx modules link together with no glue. The same compiler binary compiles b
 | 5.1.2 `const` immutable | Pointee of a `const` parameter modified during the call | — | UB | Same object passed as `const` and non-`const` |
 | 5.1.3 non-escaping | Parameter stored or retained | — | — | **Always** (compile-time) |
 | 5.1.4 non-null | Null passed to a non-null parameter | Trap at entry | UB | `nullptr` literal, or a value known to be null |
-| 5.1.5 / 5.6 extent | Access past an extent | Bounds trap | UB | Constant indices |
+| 5.6 extent | Access past the extent of a `T a[n]` parameter | Bounds trap | UB | Constant indices |
+| 5.1.5 dereferenceable | A plain `T *` parameter does not point to a valid `T` | Null check only | UB | `nullptr` literals |
 | 5.3 ownership | Owned object reachable through another path | Sanitizer (future) | UB | Obvious double-store or escape |
 | 5.4 type-based aliasing | Access through the wrong type | Type sanitizer | UB | Casts between unrelated pointer types warn |
 | 5.5 provenance | Integer→pointer without provenance | — | UB | Cast forms restricted (compile-time) |
@@ -911,9 +1006,14 @@ C and Cx modules link together with no glue. The same compiler binary compiles b
 | 8.3 FP environment | Depends on flags or rounding outside `FENV_ACCESS` | — | Unspecified results | — |
 | 9.2 enum | Out-of-range value | Trap on conversion | UB | Constants |
 | 12.1 data race | Race | ThreadSanitizer | UB | — |
+| 5.1.6 no concurrent access / writable | Another thread touches an exclusive parameter's region during the call, or the region is read-only memory | ThreadSanitizer (races only) | UB | Atomic and MMIO operations through exclusive parameters rejected |
+| 14.1 foreign retention | An unannotated foreign function keeps a pointer beyond the call | — | UB | — (the declaration must say `[[cx::escapes]]`) |
+| 6.1.3, 14.1 trusted foreign annotations | A foreign function does more than its Cx annotation says | — | UB | — |
+| 6.4 foreign `longjmp` | A `longjmp` in foreign code crosses Cx frames | — | UB | — |
+| 9.4 first-member cast | A non-`c_layout` struct pointer is used as a pointer to its first member | — | UB | Direct casts are rejected |
 | C23 leftovers | Out-of-bounds access, use-after-free, uninitialized reads | As C (sanitizers) | UB | As C |
 
-Everything else C23 calls undefined and that Cx does not list here either remains UB, or is removed with the feature that caused it: unsequenced side effects (§11.1), `setjmp`, VLAs, union punning (§5.4), K&R calls.
+**This table is the complete list of Cx contracts.** Everything else C23 calls undefined and that Cx does not list here either remains UB, or is removed with the feature that caused it: unsequenced side effects (§11.1), `setjmp`, VLAs, union punning (§5.4), K&R calls.
 
 ---
 
@@ -925,19 +1025,19 @@ What the Cx compiler emits, which LLVM passes benefit, and the evidence.
 |---|---|---|---|
 | Exclusive parameters | `noalias`; scoped metadata after inlining | AA (identified objects), GVN, LICM, LoopVectorize (no runtime checks), DSE | [E01]: 69 vs 36 asm lines of checks. [A§4.2]. |
 | Non-escaping parameters | `captures(ret: …)` / `captures(none)` | BasicAA call mod/ref, SROA and mem2reg after calls, DSE | [E03]; [A§4.1] |
-| `const` parameters immutable | `readonly` + `noalias`, `!invariant.load` | GVN across calls, LICM | [E04] |
-| Non-null + dereferenceable | `nonnull`, `dereferenceable(N)` | LICM speculation of conditional loads (842 `CondExecuted` misses in SQLite), SimplifyCFG | [A§4.1] |
+| `const` parameters immutable | `readonly` + `noalias` (no `!invariant.load`, §5.1) | GVN across calls, LICM | [E04] |
+| Non-null + dereferenceable | `nonnull`, `dereferenceable(N)` | LICM speculation of conditional loads (SQLite: 842 `LoadWithLoopInvariantAddressCondExecuted` misses), SimplifyCFG | [A§4.1] |
 | Writable exclusive parameters | `writable` + `noalias` | LICM scalar promotion (`AliasAnalysis.cpp:998-1021`) | SQLite: 117 promotions vs 24,989 misses |
 | Owned regions | `!alias.scope`/`!noalias` on loads, stores and calls | ScopedNoAliasAA → GVN, LICM, DSE, vectorizer | 93.4% "unknown" callees [A§4.1] |
 | Effect summaries | `memory(...)`, `nocallback`, `nosync`; `!callees` | BasicAA, GlobalsAA, MemorySSA, FunctionAttrs | 71% (SQLite) and 70% (Lua) of GVN misses are calls |
-| Module-private default; summary files | `internal`; declarations annotated from `.cxs` | GlobalOpt, ArgPromotion, DeadArgElim, fastcc, inliner | +4.7% (Lua one-file), −3.3% (SQLite split), 6/6 rounds [A§5.4] |
+| Module-private default; summary files | `internal`; declarations annotated from `.cxs` | GlobalOpt, ArgPromotion, DeadArgElim, fastcc, inliner | Medians: +4.7% (Lua one-file), −3.3% (SQLite split); the direction held in all 6 rounds [A§5.4] |
 | No interposition | `dso_local` / protected | Inliner, IPO, direct calls | [E10] |
-| `char` not universal; `byte` only | Precise TBAA | GVN, LICM, LoopVectorize | [E02]: 34×; SQLite TBAA −60% store clobbers |
+| `char` not universal; `byte` only | Precise TBAA | GVN, LICM, LoopVectorize | [E02]: 34×. Without TBAA, SQLite has 60% more store-clobbered loads. |
 | No union punning; distinct enums and signedness | Union TBAA, enum nodes, `!range` | GVN, SimplifyCFG, InstCombine | [A§4.2] |
-| All-integer overflow violation | `nsw`, `nuw` on arithmetic, `shl` and GEPs | IndVarSimplify, SCEV, LoopVectorize (no SCEV checks), LSR | [E05] |
+| All-integer overflow violation | `nsw`/`nuw` on `+ - *`; `nsw` on signed `shl` only; `nuw` on unsigned-index GEPs | IndVarSimplify, SCEV, LoopVectorize (no SCEV checks), LSR | [E05] |
 | Pure math | `llvm.sqrt` etc., `memory(none)` | LoopVectorize, LICM, GVN | [E06]: 2.0× |
 | Scoped reassociation | `reassoc nsz` on scoped operations | LoopVectorize reductions | [E07]: 8.1× |
-| Forward progress; reducible CFG | `mustprogress`; loop metadata | FunctionAttrs `willreturn`, LoopDeletion, LICM | [E11] |
+| Forward progress; reducible CFG | `mustprogress`; loop metadata | LoopDeletion; `willreturn` for read-only functions; loop passes on every loop | [E11] |
 | No `setjmp`, no varargs definitions | No `returns_twice`, no `va_start` | Inliner, RegisterCoalescer, StackColoring, TRE | [E08] |
 | No jumps past declarations | Lifetime markers always | StackColoring, DSE | `CGDecl.cpp:1630-1640` |
 | Unspecified struct layout | Smaller structs | Cache use; more aggregates fit `cxcall` registers | [E12]: 40 → 24 bytes |
@@ -981,7 +1081,7 @@ int g(const int *p) { int a = *p; opaque(); return a + *p; }
 | | Behaviour |
 |---|---|
 | **C** | `x` is captured by `ext`, so it is reloaded after `opaque()`. `*p` is reloaded too. |
-| **Cx** | `x` is never captured and `opaque` cannot reach it: one load, and `x` is promoted to a register. `*p` is immutable for the whole call: one load. |
+| **Cx** | `x` is never captured and `opaque` cannot reach it, so its value is forwarded and there is no reload after `opaque()`. It stays in memory, because its address was used. `*p` is immutable for the whole call: one load. |
 
 ### 18.3 Separate buffers in a struct (owned regions)
 
@@ -1014,8 +1114,8 @@ The loop vectorizes: 8.1× measured with the equivalent flags. Code outside the 
 ### 18.5 Interpreter dispatch without computed goto
 
 ```c
-typedef int (*op_fn)(struct vm *vm, const struct insn *ip);
-extern const op_fn ops[];                        /* module-private table */
+typedef int (*op_fn)(struct vm *vm, const struct insn *ip);   /* module-private type */
+static const op_fn ops[16];                      /* forward declaration (§4.5.1) */
 static int op_add(struct vm *vm, const struct insn *ip) {
     vm->acc += ip->imm;                          /* overflow-checked in checked builds */
     [[cx::musttail]] return ops[ip[1].op](vm, ip + 1);
@@ -1024,7 +1124,7 @@ static int op_add(struct vm *vm, const struct insn *ip) {
 
 **Result:**
 - Each handler ends in a tail jump, which is the threaded-code shape that computed goto provides in GNU C.
-- `op_fn` is module-private, so `!callees` lists the handlers.
+- `op_fn` and `ops` are module-private, and the table is defined later in the same module (`static const op_fn ops[16] = { op_add, … };`). So `!callees` lists exactly the handlers.
 - The handlers' summaries (`reads(ip) writes(vm)`) keep `ip` data in registers across dispatch.
 
 ### 18.6 Porting idioms
@@ -1033,12 +1133,12 @@ static int op_add(struct vm *vm, const struct insn *ip) {
 |---|---|
 | `void *memmove(void *d, const void *s, size_t n)` | `void *memmove([[cx::alias]] void *d, [[cx::alias]] const void *s, size_t n)` |
 | `for (size_t i = n; i-- > 0;)`, which underflows at the end | `for (size_t i = n; i > 0; i--) use(i - 1);` |
-| `uint32_t h = h * 31 + c;` (a hash that relies on wrapping) | `wuint32_t h = h * 31 + c;` |
+| `h = h * 31 + c;` with `uint32_t h` (a hash that relies on wrapping) | `wuint32_t h; … h = h * 31 + (wuint32_t)c;` |
 | `if (x < n)` with `int x`, `size_t n` | `if (x >= 0 && (size_t)x < n)` (the mixed-signedness error forces this) |
 | `union { float f; uint32_t u; } v; v.f = x; return v.u;` | `return cx_bit_cast(uint32_t, x);` |
 | `list_add(struct list *l, struct node *n)` storing `n` | `list_add(struct list *l, [[cx::escapes]] struct node *n)` |
 | `volatile uint32_t *reg = (void *)0x40000000; *reg = 1;` | `mmio_write32((void *)0x40000000, 1);` |
-| `_Atomic int ready; ready = 1;` | `int ready; atomic_store_explicit(&ready, 1, memory_order_release);` |
+| `_Atomic int ready; ready = 1;` | `int ready; atomic_store_explicit(&ready, 1, memory_order_seq_cst);` (same ordering; weaken to `release` only after review) |
 | `double _Complex z = a * b;` | `cx_cdouble z = cx_cmul(a, b);` (`<cxcomplex.h>`) |
 | `goto retry;` (backward) | `for (;;) { … if (ok) break; }` |
 
@@ -1113,6 +1213,68 @@ Phase 0 answers the central hypothesis (§17): how much of the call-opacity barr
 
 ---
 
+## 22. Conformance, versioning and implementation-defined behaviour
+
+### 22.1 Conformance
+
+**A conforming implementation:**
+- accepts every conforming program;
+- issues a diagnostic for every violation of a rule marked **compile-time** in this document;
+- provides both build modes of §16.1.
+
+A **hosted** implementation provides the whole library of §15. A **freestanding** implementation provides at least `<stddef.h>`, `<stdint.h>`, `<cxbyte.h>`, `<cxptr.h>`, `<cxwrap.h>` and `<cxmmio.h>`.
+
+**A conforming program:**
+- uses only the features of this document and the foreign-interoperability rules of §14;
+- is accepted without compile-time diagnostics;
+- during execution, violates neither a checked rule nor a contract (§16.2).
+
+Checked-mode traps are a debugging aid. A program that traps is not conforming, and its release build has undefined behaviour.
+
+### 22.2 Versioning and predefined macros
+
+| Item | Value |
+|---|---|
+| Language mode | `-std=cx1`, or the `.cx`/`.cxh` extensions |
+| `__CX__` | `1` |
+| `__CX_VERSION__` | `202609L` (this draft; date-based, like `__STDC_VERSION__`) |
+| `__STDC_VERSION__` | `202311L`, so that foreign headers select their C23 paths |
+| `__STDC_NO_VLA__`, `__STDC_NO_COMPLEX__` | `1` |
+| `__STDC_NO_ATOMICS__` | `1`: there are no `_Atomic` types. Cx atomics come from Cx's own `<stdatomic.h>` (§12.1). |
+| `__STDC_IEC_559__` | `1` |
+| `__CHAR_UNSIGNED__` | `1` |
+| `__CX_CHECKED__` | `1` in checked builds, undefined in release |
+
+### 22.3 Implementation-defined behaviour
+
+Cx fixes several items that are implementation-defined in C: `char` is unsigned; struct layout (§9.4); the enum underlying type (§9.2); evaluation order (§11.1). The remaining implementation-defined items:
+
+- Integer and pointer widths, and alignments, follow the target's C ABI.
+- `int128_t`/`uint128_t` exist only where the target supports them.
+- Right shift of a negative signed value is arithmetic.
+- An explicit cast of an out-of-range integer to a signed type truncates modulo 2ⁿ.
+- The `cxcall` register assignment per target is given in a separate ABI annex (§21).
+- The access-path depth *k* of §5.3 defaults to 3.
+- Checked-mode diagnostics: their format and whether they print a stack trace.
+
+### 22.4 Compiler extensions
+
+| Extension | Status |
+|---|---|
+| GNU inline `asm` | Allowed. An `asm` statement has unknown effects (all items of §6.1) unless it has no `"memory"` clobber and only register operands. |
+| `__builtin_*` functions | Allowed |
+| `__attribute__((…))` | Accepted in foreign code only; Cx code uses `[[…]]` |
+| `__int128` | Accepted; spelled `int128_t` in `<stdint.h>` |
+| Statement expressions, nested functions, computed goto, `__typeof_unqual__`, zero-length arrays | Removed (§3.3) |
+
+### 22.5 Extent of standard-library annotations
+
+Every function Cx provides from the C23 library (clause 7) has a Cx declaration in its `.cxh`, with parameter attributes and an effect summary.
+
+Functions of other foreign libraries get the foreign defaults of §14.1 until a project adds `.cxh` redeclarations. These are trusted contracts (§16.2).
+
+---
+
 ## Appendix A. Changes against C23, by clause
 
 | C23 clause | Cx change |
@@ -1126,6 +1288,7 @@ Phase 0 answers the central hypothesis (§17): how much of the call-opacity barr
 | 6.3.1 Arithmetic conversions | Promotions kept; mixed signedness and implicit narrowing are errors (§7.2) |
 | 6.3.2.3 Pointers | Strict provenance (§5.5); `void *` conversions restricted (§7.2) |
 | 6.4.1 Keywords | 41 kept, 13 removed, alternate spellings removed (§3) |
+| 6.4.5 String literals | Type `const char[N]` (§7.4) |
 | 6.4.6 Punctuators | Digraphs removed (§13.4) |
 | 6.5 Expressions | Left-to-right evaluation (§11.1); effective-type rules without char exemption, with `byte` (§5.4); overflow of all standard integer types is a violation (§7.1); shifts (§7.3) |
 | 6.5.3.2 Function calls | Prototypes required; parameter contracts (§5.1); varargs only for foreign callees (§6.5) |
@@ -1145,44 +1308,41 @@ Phase 0 answers the central hypothesis (§17): how much of the call-opacity barr
 
 ## Appendix B. Attribute, pragma and builtin reference
 
-**Parameter attributes:**
+All Cx attributes use C23's standard attribute syntax (6.7.13). "Position" gives where the attribute-specifier goes, and what it appertains to.
 
-- **`[[cx::alias]]`**: the parameter may alias other pointers; the exclusivity and immutability guarantees are dropped (§5.1).
-- **`[[cx::escapes]]`**: the callee may retain, store or free the pointee (§5.1.3).
-- **`[[cx::nullable]]`**: the parameter may be null; it has no dereferenceability guarantee (§5.1.4).
+| Attribute | Appertains to | Position | Arguments | Section |
+|---|---|---|---|---|
+| `[[cx::alias]]` | a pointer parameter | start of the parameter declaration: `f([[cx::alias]] T *p)`; also in function-pointer types | none | §5.1 |
+| `[[cx::escapes]]` | a pointer parameter; or a function, meaning its variadic arguments may be retained | parameter: as above. Function: start of the declaration. | none | §5.1.3, §14.1 |
+| `[[cx::nullable]]` | a pointer parameter | as `alias` | none | §5.1.4 |
+| `[[cx::owned]]` | a pointer member | start of the member declaration: `struct s { [[cx::owned]] T *f; };` | none | §5.3 |
+| `[[cx::wrapping]]` | an integer typedef, creating a distinct type | after the typedef's declarator: `typedef uint32_t wuint32_t [[cx::wrapping]];` | none | §7.1 |
+| `[[cx::may_alias]]` | a typedef (reserved for standard headers) | as `wrapping` | none | §5.4 |
+| `[[cx::c_layout]]` | a struct or union | after the `struct`/`union` keyword: `struct [[cx::c_layout]] s { … };` | none | §9.4 |
+| `[[cx::flags]]` | an enum | after `enum`: `enum [[cx::flags]] e { … };` | none | §9.2 |
+| `[[cx::effects(…)]]` | a function, or a function-pointer type | function: start of the declaration. Function-pointer type: after the parameter list. | see grammar below | §6.1, §6.2 |
+| `[[cx::c_abi]]` | a function, or a function-pointer typedef | function: start of the declaration. Typedef: after the parameter list. | none | §10.2 |
+| `[[cx::interposable]]` | an exported function | start of the definition | none | §4.2 |
+| `[[cx::musttail]]` | a `return` statement | before `return` | none | §6.6 |
 
-**Member attribute:**
+Accepted C23 standard attributes: `[[unsequenced]]` and `[[reproducible]]` (mapped to effect summaries, §6.1), plus `[[noreturn]]`, `[[nodiscard]]`, `[[maybe_unused]]`, `[[deprecated]]` and `[[fallthrough]]`.
 
-- **`[[cx::owned]]`**: the pointer member owns its pointee (§5.3).
+**Effects grammar:**
 
-**Type and typedef attributes:**
+```text
+effects-arg  := item { "," item }
+item         := "none" | "alloc" | "io" | "callback" | "sync"
+              | "reads" "(" target { "," target } ")"
+              | "writes" "(" target { "," target } ")"
+target       := parameter-name | "module" | "shared" | "..."
+```
 
-- **`[[cx::wrapping]]`**: an integer typedef with modular arithmetic (§7.1).
-- **`[[cx::may_alias]]`**: universal aliasing type; reserved for standard headers (§5.4).
-
-**Struct, union and enum attributes:**
-
-- **`[[cx::c_layout]]`**: exact C layout (§9.4).
-- **`[[cx::flags]]`**: an open, bitwise enum (§9.2).
-
-**Function attributes:**
-
-- **`[[cx::effects(items)]]`**: an effect upper bound (§6.1). The item grammar is `none` | `reads(x, …)` | `writes(x, …)` | `alloc` | `io` | `callback` | `sync`, where `x` is a parameter name, `module` or `shared`.
-- **`[[cx::c_abi]]`**: C calling convention for export to C (§10.2).
-- **`[[cx::interposable]]`**: the exported symbol may be interposed (§4.2).
-- The C23 attributes `[[unsequenced]]`, `[[reproducible]]`, `[[noreturn]]`, `[[nodiscard]]`, `[[maybe_unused]]` and `[[deprecated]]`.
-
-**Statement attributes:**
-
-- **`[[cx::musttail]]`**: guaranteed tail call (§6.6).
-- The C23 attribute `[[fallthrough]]`.
+`...` names the memory reached through variadic pointer arguments. Parameter names refer to the names in the same declaration, which must therefore be named.
 
 **Pragmas:**
 
-- `#pragma cx fp_reassociate(on|off)` (§8)
-- `#pragma STDC FENV_ACCESS`
-- `#pragma STDC FP_CONTRACT`
-- `#pragma STDC CX_LIMITED_RANGE`
+- `#pragma cx fp_reassociate(on|off)`: scope and placement in §8.
+- `#pragma STDC FENV_ACCESS`, `#pragma STDC FP_CONTRACT`, `#pragma STDC CX_LIMITED_RANGE`.
 
 **Header-provided builtins:**
 

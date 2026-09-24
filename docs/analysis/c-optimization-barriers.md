@@ -221,6 +221,7 @@ int sum_twice(const int *p) { int a = *p; opaque(); return a + *p; }
 | Loads GVN *did* eliminate (`LoadElim` + `LoadPRE`) | 1,725 | 445 | 1,044 |
 | LICM: "loop may invalidate its value" | 24,989 | 4,430 | 8,498 |
 | LICM: loop accesses promoted to registers | 117 | 16 | 123 |
+| LICM: "load is conditionally executed" (not hoisted) | 842 | 192 | 612 |
 
 **What those blocking calls are.** We matched each remark's `ClobberedBy` location to the call in the optimized IR (`census/callkinds.py`, `calleemem.py`):
 
@@ -665,6 +666,7 @@ All inputs are in [`c-optimization-barriers/`](c-optimization-barriers/):
 | Path | What |
 |---|---|
 | `kernels/e01…e12_*.c` | One micro-kernel per rule (§4) |
+| `kernels/e13_exotic_types.c` | `_Complex`, `long double` and `_BitInt` code generation, added with the Cx spec. Results are in `kernels/RESULTS.txt`. |
 | `kernels/bench_kern.c`, `bench_driver.c` | Timed kernels. The driver is compiled separately so it can't see into the kernels. |
 | `census/remarks.py` | Aggregates `-fsave-optimization-record` YAML by pass, remark and message |
 | `census/callkinds.py`, `calleemem.py`, `pertu.py` | Classify the calls that block GVN (direct, indirect, external) and the memory effects of the callees |
