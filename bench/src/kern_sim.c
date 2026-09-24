@@ -1,5 +1,5 @@
 /* Simulation and number kernels: N-body, Mandelbrot, prime sieve. */
-#include "bench.h"
+#include "bench.cxh"
 
 #include <math.h>
 #include <stdbit.h>

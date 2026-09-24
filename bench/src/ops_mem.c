@@ -1,6 +1,6 @@
 /* Memory operations: memcpy/memset/memcmp, DRAM bandwidth and latency,
  * strided access, and malloc/free churn. */
-#include "bench.h"
+#include "bench.cxh"
 
 #include <string.h>
 

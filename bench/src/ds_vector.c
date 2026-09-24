@@ -1,5 +1,5 @@
 /* Growable arrays: a dynamic vector and an append-heavy byte string builder. */
-#include "bench.h"
+#include "bench.cxh"
 
 #include <stdlib.h>
 #include <string.h>

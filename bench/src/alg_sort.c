@@ -1,6 +1,6 @@
 /* Sorting: quicksort, mergesort, heapsort, radix sort, libc qsort, insertion
  * sort of small arrays, and a quicksort of string pointers. */
-#include "bench.h"
+#include "bench.cxh"
 
 #include <stdlib.h>
 #include <string.h>

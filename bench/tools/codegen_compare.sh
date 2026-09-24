@@ -1,6 +1,6 @@
 #!/bin/sh
 # Compare the object files produced by the two toolchains.
-#   codegen_compare.sh DIR_C DIR_CX
+#   codegen_compare.sh DIR_C DIR_CX [BIN_C BIN_CX]
 # For each object: "identical" if the files match after removing the
 # .comment section (it holds the compiler's version string); otherwise the
 # sections that differ are listed. Exit status 1 if any object differs.
@@ -25,5 +25,19 @@ for fa in "$a"/*.o; do
     echo "DIFFERS   $n:${secs:- (symbol or relocation tables only)}"
   fi
 done
-echo "codegen-compare: $same identical, $diff different"
+echo "codegen-compare: $same identical, $diff different object files"
+# Linked executables: compare the loaded sections (code, read-only data, data,
+# unwind tables); the .comment section holds the compiler version string.
+if [ -n "$3" ] && [ -n "$4" ]; then
+  bdiff=""
+  for s in .text .rodata .data .eh_frame .init_array .fini_array; do
+    $OBJCOPY -O binary --only-section="$s" "$3" "$tmp/ba" 2>/dev/null
+    $OBJCOPY -O binary --only-section="$s" "$4" "$tmp/bb" 2>/dev/null
+    cmp -s "$tmp/ba" "$tmp/bb" || bdiff="$bdiff $s"
+  done
+  $OBJCOPY --remove-section=.comment "$3" "$tmp/ea"; $OBJCOPY --remove-section=.comment "$4" "$tmp/eb"
+  if cmp -s "$tmp/ea" "$tmp/eb"; then echo "codegen-compare: linked executables identical (except .comment)"
+  elif [ -z "$bdiff" ]; then echo "codegen-compare: linked executables: loaded sections identical; other metadata differs"
+  else echo "codegen-compare: linked executables differ in:$bdiff"; diff=$((diff+1)); fi
+fi
 [ "$diff" -eq 0 ]

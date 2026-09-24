@@ -1,6 +1,6 @@
 /* Linked lists: a singly linked list of heap nodes and an LRU cache built from
  * a doubly linked list plus an open-addressing index. */
-#include "bench.h"
+#include "bench.cxh"
 
 /* ---- slist: push-front, traverse, remove every k-th node, free ------------ */
 

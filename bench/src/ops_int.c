@@ -1,5 +1,5 @@
 /* Integer operations: arithmetic chains, division/modulo, bit operations. */
-#include "bench.h"
+#include "bench.cxh"
 
 #include <stdbit.h>
 

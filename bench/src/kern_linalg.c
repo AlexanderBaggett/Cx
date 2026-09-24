@@ -1,5 +1,5 @@
 /* Numeric kernels: dense matrix multiply, FFT, stencil, spectral norm. */
-#include "bench.h"
+#include "bench.cxh"
 
 #include <math.h>
 #include <string.h>

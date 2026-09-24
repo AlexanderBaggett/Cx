@@ -4,17 +4,17 @@
  * -DBENCH_ONLY_<category> (make ONLY=<category>) includes one list only. */
 #if defined(BENCH_ONLY_ops) || defined(BENCH_ONLY_ds) || defined(BENCH_ONLY_alg) || defined(BENCH_ONLY_kern)
 #  if defined(BENCH_ONLY_ops)
-#    include "list_ops.h"
+#    include "list_ops.cxh"
 #  elif defined(BENCH_ONLY_ds)
-#    include "list_ds.h"
+#    include "list_ds.cxh"
 #  elif defined(BENCH_ONLY_alg)
-#    include "list_alg.h"
+#    include "list_alg.cxh"
 #  else
-#    include "list_kern.h"
+#    include "list_kern.cxh"
 #  endif
 #else
-#  include "list_ops.h"
-#  include "list_ds.h"
-#  include "list_alg.h"
-#  include "list_kern.h"
+#  include "list_ops.cxh"
+#  include "list_ds.cxh"
+#  include "list_alg.cxh"
+#  include "list_kern.cxh"
 #endif

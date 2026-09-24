@@ -1,8 +1,8 @@
 /* Control flow and calls: branches, switch dispatch, direct and indirect
  * calls, recursion, and structs passed by value. The call targets are in
  * ops_call_targets.c so they cannot be inlined without LTO. */
-#include "bench.h"
-#include "ops_calls.h"
+#include "bench.cxh"
+#include "ops_calls.cxh"
 
 /* ---- branch_unpredictable / branch_predictable --------------------------
  * One kernel, two inputs: the same multiset of bytes in random order (the

@@ -1,5 +1,5 @@
 /* Array-backed structures: binary heap, ring buffer, bitset, union-find. */
-#include "bench.h"
+#include "bench.cxh"
 
 #include <stdbit.h>
 #include <stdlib.h>

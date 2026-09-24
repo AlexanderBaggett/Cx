@@ -2,8 +2,8 @@
  * (ops_ctrl.c). They live in their own translation unit so that, without
  * LTO, neither compiler can inline them into the callers. This file defines
  * no benchmark of its own. Shared declarations are in ops_calls.h. */
-#include "bench.h"
-#include "ops_calls.h"
+#include "bench.cxh"
+#include "ops_calls.cxh"
 
 /* ---- call_direct targets ------------------------------------------------ */
 

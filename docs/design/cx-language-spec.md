@@ -269,6 +269,12 @@ For a parameter `P` of pointer type `T *` (where `T` may be `const`-qualified), 
   - `P`-based values *may* be returned directly as the function's result, or inside an aggregate returned in registers (§10.1). The caller then treats the result as based on the argument it passed.
   - Returning a `P`-based value inside an aggregate returned through memory (larger than the `cxcall` register limit) is an error unless `P` is `[[cx::escapes]]`.
   - When the callee's summary is unknown (a function pointer without effect bounds, or a missing summary file), the caller assumes the result may be based on *every* pointer argument.
+  - **Ownership moves are not escapes.** A value loaded from an owned field of an object in `P`'s region may be:
+    - stored into another owned field in the same region;
+    - passed to an `[[cx::escapes]]` parameter such as `free` or `realloc`;
+    - freed;
+
+    provided the source field is overwritten before it is used again (§5.3.1). The parameter `P` itself still does not escape. This is how trees rotate, lists unlink nodes and owned buffers are reallocated (`v->data = realloc(v->data, n)`). None of these need `[[cx::escapes]]` on `P`.
 - **5.1.4 Non-null.** `P` is not a null pointer.
 - **5.1.5 Dereferenceable.**
   - If `T` is a complete object type, `P` points to at least `sizeof(T)` bytes that stay valid (not freed) throughout `B`.

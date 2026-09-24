@@ -1,6 +1,6 @@
 /* Graph algorithms on random sparse graphs in CSR form: BFS, iterative DFS
  * (connected components) and Dijkstra with a binary heap. */
-#include "bench.h"
+#include "bench.cxh"
 
 #include <string.h>
 

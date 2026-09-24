@@ -1,6 +1,6 @@
 /* Floating-point operations: mul/add chains, division and square root, libm
  * calls, and float reductions in source order. */
-#include "bench.h"
+#include "bench.cxh"
 
 #include <math.h>
 

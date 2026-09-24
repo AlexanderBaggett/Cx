@@ -1,4 +1,4 @@
-#include "bench.h"
+#include "bench.cxh"
 
 #include <math.h>
 #include <stdio.h>

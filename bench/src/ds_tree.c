@@ -1,5 +1,5 @@
 /* Trees: an AVL search tree of heap nodes and an array-backed 26-way trie. */
-#include "bench.h"
+#include "bench.cxh"
 
 #include <stdlib.h>
 #include <string.h>

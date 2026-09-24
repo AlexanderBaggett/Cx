@@ -1,5 +1,5 @@
 /* Codec kernels: CRC-32, base64, SHA-256, LZ77 match finding, run-length coding. */
-#include "bench.h"
+#include "bench.cxh"
 
 #include <string.h>
 

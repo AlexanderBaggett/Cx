@@ -1,6 +1,6 @@
 /* Dynamic programming and backtracking: Levenshtein distance, 0/1 knapsack,
  * N-queens. */
-#include "bench.h"
+#include "bench.cxh"
 
 #include <string.h>
 

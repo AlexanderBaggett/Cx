@@ -1,5 +1,5 @@
 /* Searching: binary search (lower_bound) and KMP substring search. */
-#include "bench.h"
+#include "bench.cxh"
 
 /* ---- search_binary: lower_bound queries on a sorted array ---------------- */
 

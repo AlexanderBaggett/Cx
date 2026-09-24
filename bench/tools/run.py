@@ -52,15 +52,26 @@ def main():
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     path = os.path.join(ROOT, "results", f"{stamp}.jsonl")
     rnd = random.Random(a.seed)
+    cats = {}
+    for ln in lists[tcs[0]].splitlines():
+        p = ln.split(None, 2)
+        if len(p) >= 2:
+            cats[p[0]] = p[1]
+    buildinfo = {}
+    for tc in tcs:
+        bi = os.path.join(a.build, tc, "buildinfo.json")
+        try:
+            with open(bi) as f:
+                buildinfo[tc] = json.load(f)
+        except (OSError, ValueError):
+            buildinfo[tc] = {"error": f"missing {bi}"}
     meta = {
         "meta": {
             "time": stamp, "rounds": a.rounds, "iters": a.iters, "cpu": a.cpu,
-            "toolchains": tcs, "benchmarks": names,
+            "toolchains": tcs, "benchmarks": names, "categories": cats,
             "machine": {"platform": platform.platform(), "processor": sh(["sh", "-c", "grep -m1 'model name' /proc/cpuinfo"]),
                         "nproc": os.cpu_count()},
-            "compilers": {"c": sh([os.environ.get("CC_C", os.path.expanduser("~/llvm-23.1.2-release/bin/clang")), "--version"]).splitlines()[:1],
-                          "cx": sh([os.environ.get("CC_CX", os.path.join(ROOT, "..", "..", "cx-build", "bin", "clang")), "--version"]).splitlines()[:1]},
-            "cx_flags": os.environ.get("CX_FLAGS", ""),
+            "buildinfo": buildinfo,
         }
     }
     with open(path, "w") as out:
@@ -74,10 +85,12 @@ def main():
                 for tc in runs:
                     p = subprocess.run(["taskset", "-c", a.cpu, bins[tc], name, "--iters", str(a.iters)],
                                        capture_output=True, text=True)
-                    if p.returncode != 0 or not p.stdout.strip():
+                    lines = [ln for ln in p.stdout.splitlines() if ln.startswith("{")]
+                    if not lines:
                         rec = {"round": r, "bench": name, "tc": tc, "error": p.stderr.strip()[-500:], "rc": p.returncode}
                     else:
-                        j = json.loads(p.stdout.strip().splitlines()[-1])
+                        # an unstable checksum exits 1 but still prints the JSON line
+                        j = json.loads(lines[-1])
                         rec = {"round": r, "bench": name, "tc": tc, "ns": j["ns"], "checksum": j["checksum"], "stable": j["stable"]}
                     out.write(json.dumps(rec) + "\n")
                     out.flush()

@@ -1,6 +1,6 @@
 /* String and byte operations: libc string functions, byte buffers accessed
  * through struct fields, and hand-written integer parsing and formatting. */
-#include "bench.h"
+#include "bench.cxh"
 
 #include <string.h>
 

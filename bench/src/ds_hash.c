@@ -1,6 +1,6 @@
 /* Hash maps: open addressing with integer keys, separate chaining with
  * string keys. */
-#include "bench.h"
+#include "bench.cxh"
 
 #include <string.h>
 
