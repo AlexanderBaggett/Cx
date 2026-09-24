@@ -59,7 +59,7 @@ make report            # writes results/<timestamp>.md
 
 The protocol, in `tools/run.py`:
 
-- Every run is a fresh process pinned to one CPU (`--cpu`, default 3).
+- Every run is a fresh process pinned to one CPU (`--cpu`, default 3). Every toolchain's binary runs from a path of the same length (`build/run/t<i>`), because the program path shifts stack alignment and can bias timings.
 - A process does `setup()`, two untimed warm-up `run()` calls (`--warmup`), then `ITERS` timed `run()` calls.
 - In each round the benchmark order is shuffled. For each benchmark, the toolchains run back to back in shuffled order.
 - `ctrl` is a byte-identical copy of the C binary. Its spread against C is the **noise floor**. A Cx result counts as faster or slower only if every round agrees and the median lies outside the largest control deviation (at least 2%).
@@ -68,6 +68,13 @@ The protocol, in `tools/run.py`:
 - **C-library-bound benchmarks are left out of the compiler-bound geomean.** They are tagged `(libc)`: `str_libc`, `mem_copy`, `mem_set_cmp`, `alloc_churn`, `sort_qsort`, `fp_libm`, `fmt_snprintf` and `slist`. Both toolchains call the same glibc.
 
 Keep the machine otherwise idle while running. On a shared VM, single rounds commonly vary by ±5% even for identical binaries, so the medians over rounds matter.
+
+## Baseline
+
+The first two runs compared the unchanged Clang release with this repository's unmodified compiler, which produce byte-identical code. See [`results/README.md`](results/README.md).
+
+- **Result:** checksums identical 78/78; geomean difference within ±0.5%; every benchmark judged "same".
+- **Per-benchmark noise floor:** about ±3%.
 
 ## What this suite can and cannot show
 
